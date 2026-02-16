@@ -1,0 +1,66 @@
+services:
+  # Laravel Backend API
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bidkhong-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/var/www
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - APP_URL=http://localhost:8000
+      - DB_CONNECTION=mysql
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_DATABASE=auction_app
+      - DB_USERNAME=root
+      - DB_PASSWORD=secret
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - bidkhong-network
+
+  # MySQL Database
+  db:
+    image: mysql:8.0
+    container_name: bidkhong-db
+    ports:
+      - "3307:3306"  # ใช้ port 3307 เพื่อไม่ชนกับ MySQL บนเครื่อง
+    environment:
+      - MYSQL_ROOT_PASSWORD=secret
+      - MYSQL_DATABASE=auction_app
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-psecret"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bidkhong-network
+
+  # phpMyAdmin (Optional - จัดการ DB ผ่าน browser)
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: bidkhong-phpmyadmin
+    ports:
+      - "8080:80"
+    environment:
+      - PMA_HOST=db
+      - MYSQL_ROOT_PASSWORD=secret
+    depends_on:
+      - db
+    networks:
+      - bidkhong-network
+
+networks:
+  bidkhong-network:
+    driver: bridge
+
+volumes:
+  db-data:
