@@ -25,10 +25,12 @@ return new class extends Migration {
             ->where('status', 'pending_confirm')
             ->update(['status' => 'pending_buyer_confirm']);
 
-        // ลบ column seller_confirmed_at (ไม่ใช้แล้ว)
-        Schema::table('orders', function (Blueprint $table) {
-            $table->dropColumn('seller_confirmed_at');
-        });
+        // ลบ column seller_confirmed_at (ไม่ใช้แล้ว) — เช็คก่อนว่ามีอยู่ไหม
+        if (Schema::hasColumn('orders', 'seller_confirmed_at')) {
+            Schema::table('orders', function (Blueprint $table) {
+                $table->dropColumn('seller_confirmed_at');
+            });
+        }
     }
 
     public function down(): void

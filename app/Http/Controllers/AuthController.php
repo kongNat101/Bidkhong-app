@@ -18,7 +18,7 @@ class AuthController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'string', 'min:8'],
-            'phone_number' => ['nullable', 'string', 'max:20'],
+            'phone_number' => ['required', 'string', 'max:20', 'unique:users'],
         ]);
 
         $user = User::create([
@@ -98,10 +98,28 @@ class AuthController extends Controller
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'email' => ['sometimes', 'string', 'email', 'max:255', 'unique:users,email,' . $user->id],
-            'phone_number' => ['nullable', 'string', 'max:20'],
+            'phone_number' => ['sometimes', 'string', 'max:20', 'unique:users,phone_number,' . $user->id],
         ]);
 
-        $user->update($validated);
+        // เช็คว่ามีข้อมูลส่งมาไหม
+        if (empty($validated)) {
+            return response()->json([
+                'message' => 'No data provided for update',
+            ], 422);
+        }
+
+        // เช็คว่าค่าที่ส่งมาต่างจากค่าปัจจุบันหรือไม่
+        $changes = array_filter($validated, function ($value, $key) use ($user) {
+            return $user->{$key} !== $value;
+        }, ARRAY_FILTER_USE_BOTH);
+
+        if (empty($changes)) {
+            return response()->json([
+                'message' => 'No changes detected',
+            ], 422);
+        }
+
+        $user->update($changes);
         $user->load('wallet');
 
         return response()->json([

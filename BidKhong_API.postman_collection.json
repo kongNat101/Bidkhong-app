@@ -35,6 +35,11 @@
       "key": "user_id",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "order_id",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -73,7 +78,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}"
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\",\n  \"phone_number\": \"0812345678\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/register",
@@ -165,6 +170,88 @@
               ]
             },
             "description": "Get current authenticated user information with wallet."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Updated\",\n  \"phone_number\": \"0812345678\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/profile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "profile"
+              ]
+            },
+            "description": "Update profile info. All fields optional: name, email, phone_number."
+          },
+          "response": []
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"password123\",\n  \"new_password\": \"newpassword123\",\n  \"new_password_confirmation\": \"newpassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/change-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "change-password"
+              ]
+            },
+            "description": "Change password. Requires current password and new password (min 8 chars) with confirmation."
           },
           "response": []
         },
@@ -511,7 +598,7 @@
                 "{{product_id}}"
               ]
             },
-            "description": "Get single product with details."
+            "description": "Get single product with details, bid_increment, and minimum_bid."
           },
           "response": []
         },
@@ -544,10 +631,6 @@
             },
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
               {
                 "key": "Accept",
                 "value": "application/json"
@@ -583,7 +666,7 @@
                 },
                 {
                   "key": "auction_end_time",
-                  "value": "2026-02-15 18:00:00",
+                  "value": "2026-02-20 18:00:00",
                   "type": "text"
                 },
                 {
@@ -624,7 +707,41 @@
                 "products"
               ]
             },
-            "description": "Create a new auction product. Requires authentication."
+            "description": "Create a new auction product. Requires authentication. Uses FormData for file upload."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Product",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/products/{{product_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products",
+                "{{product_id}}"
+              ]
+            },
+            "description": "Delete a product. Only product owner can delete."
           },
           "response": []
         },
@@ -709,7 +826,42 @@
                 "bid"
               ]
             },
-            "description": "Place a bid on a product. Validates: auction not expired, price > current_price, price >= min_price, sufficient balance."
+            "description": "Place a bid on a product. Validates: auction active, price > current_price, min bid increment (calculated from buyout_price), sufficient balance. Holds bid amount in escrow."
+          },
+          "response": []
+        },
+        {
+          "name": "Buy Now",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/products/{{product_id}}/buy-now",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products",
+                "{{product_id}}",
+                "buy-now"
+              ]
+            },
+            "description": "Buy product immediately at buyout price. Ends auction, refunds all existing bidders, creates order. Requires sufficient wallet balance."
           },
           "response": []
         },
@@ -779,7 +931,7 @@
                 "bids"
               ]
             },
-            "description": "Get all bids placed by current user."
+            "description": "Get all bids placed by current user with summary (total, winning, outbid, won, lost). Filter with ?status=winning|outbid|won|lost"
           },
           "response": []
         }
@@ -830,6 +982,82 @@
             "description": "Add funds to user wallet. Amount must be > 0."
           },
           "response": []
+        },
+        {
+          "name": "Withdraw",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1000,\n  \"bank_code\": \"KBANK\",\n  \"account_number\": \"1234567890\",\n  \"account_name\": \"John Doe\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/wallet/withdraw",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wallet",
+                "withdraw"
+              ]
+            },
+            "description": "Withdraw funds from wallet. Min 100 Baht. Requires bank_code, account_number (10-15 chars), account_name."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Transactions",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/wallet/transactions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wallet",
+                "transactions"
+              ]
+            },
+            "description": "Get last 20 wallet transactions. Types: topup, withdraw, bid_placed, bid_refund, escrow_hold, escrow_release, auction_won, auction_sold."
+          },
+          "response": []
         }
       ],
       "description": "Wallet management endpoints"
@@ -868,7 +1096,7 @@
                 "orders"
               ]
             },
-            "description": "Get all orders for current user (won auctions)."
+            "description": "Get all orders for current user (as buyer or seller)."
           },
           "response": []
         },
@@ -903,7 +1131,7 @@
                 "close"
               ]
             },
-            "description": "Manually close auction and create order for winner. Only product owner can close."
+            "description": "Manually close auction and create order for winner. Only product owner can close. Creates order with status pending_buyer_confirm."
           },
           "response": []
         },
@@ -928,13 +1156,13 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/orders/1/verify",
+              "raw": "{{base_url}}/orders/{{order_id}}/verify",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "orders",
-                "1",
+                "{{order_id}}",
                 "verify"
               ]
             },
@@ -944,6 +1172,204 @@
         }
       ],
       "description": "Order management endpoints"
+    },
+    {
+      "name": "Post-Auction",
+      "item": [
+        {
+          "name": "Get Order Detail",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}/detail",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                "{{order_id}}",
+                "detail"
+              ]
+            },
+            "description": "Get order detail with buyer and seller contact info (name, phone_number). Contact is visible immediately after auction ends. Returns my_role (buyer/seller)."
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm Order (Buyer)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}/confirm",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                "{{order_id}}",
+                "confirm"
+              ]
+            },
+            "description": "Buyer confirms order. Holds escrow from buyer wallet. Sets ship_deadline to 3 days. Only buyer can confirm. Must be in pending_buyer_confirm status."
+          },
+          "response": []
+        },
+        {
+          "name": "Ship Order (Seller)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}/ship",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                "{{order_id}}",
+                "ship"
+              ]
+            },
+            "description": "Seller marks order as shipped. Sets receive_deadline to 7 days. Only seller can ship. Must be in confirmed status."
+          },
+          "response": []
+        },
+        {
+          "name": "Receive Order (Buyer)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}/receive",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                "{{order_id}}",
+                "receive"
+              ]
+            },
+            "description": "Buyer confirms item received. Releases escrow payment to seller. Marks order as completed. Only buyer can confirm receipt. Must be in shipped status."
+          },
+          "response": []
+        },
+        {
+          "name": "Dispute Order (Buyer)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{auth_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "reason",
+                  "value": "Item not as described",
+                  "type": "text",
+                  "description": "Reason for dispute (required, max 1000 chars)"
+                },
+                {
+                  "key": "evidence_images[]",
+                  "type": "file",
+                  "src": "",
+                  "description": "Evidence images (optional, max 5 files, each max 5MB)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}/dispute",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                "{{order_id}}",
+                "dispute"
+              ]
+            },
+            "description": "Buyer files a dispute. Only buyer can dispute. Must be in shipped status. Requires reason, optional evidence images. Admin will review."
+          },
+          "response": []
+        }
+      ],
+      "description": "Post-auction flow: confirm → ship → receive/dispute. Contact info visible immediately after auction ends."
     },
     {
       "name": "Notifications",
