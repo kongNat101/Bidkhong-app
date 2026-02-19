@@ -57,4 +57,14 @@ class User extends Authenticatable
     {
         return $this->hasMany(Notification::class);
     }
+
+    public function reports()
+    {
+        return $this->hasMany(Report::class, 'reporter_id');
+    }
+
+    public function strikes()
+    {
+        return $this->hasMany(UserStrike::class);
+    }
 }

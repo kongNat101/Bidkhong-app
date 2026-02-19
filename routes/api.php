@@ -9,6 +9,8 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PostAuctionController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\AdminController;
 
 // Auth Routes (ไม่ต้อง login) - Rate limited to 10 requests per minute
 Route::middleware('throttle:10,1')->group(function () {
@@ -73,4 +75,27 @@ Route::middleware(['auth:sanctum', 'throttle:100,1'])->group(function () {
     Route::get('/notifications/unread', [NotificationController::class , 'unread']);
     Route::patch('/notifications/read-all', [NotificationController::class , 'markAllAsRead']);
     Route::patch('/notifications/{id}/read', [NotificationController::class , 'markAsRead']);
+
+    // Reports
+    Route::post('/reports', [ReportController::class, 'store']);
+    Route::get('/reports', [ReportController::class, 'index']);
+});
+
+// Admin Routes (ต้อง login + เป็น admin) - Rate limited to 100 requests per minute
+Route::middleware(['auth:sanctum', 'admin', 'throttle:100,1'])->prefix('admin')->group(function () {
+    // Dashboard
+    Route::get('/dashboard', [AdminController::class, 'dashboard']);
+
+    // Reports
+    Route::get('/reports', [AdminController::class, 'reports']);
+    Route::patch('/reports/{id}', [AdminController::class, 'updateReport']);
+
+    // Disputes
+    Route::get('/disputes', [AdminController::class, 'disputes']);
+    Route::patch('/disputes/{id}/resolve', [AdminController::class, 'resolveDispute']);
+
+    // Users
+    Route::get('/users', [AdminController::class, 'users']);
+    Route::get('/users/{id}', [AdminController::class, 'userDetail']);
+    Route::post('/users/{id}/ban', [AdminController::class, 'banUser']);
 });

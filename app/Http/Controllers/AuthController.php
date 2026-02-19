@@ -7,8 +7,10 @@ use App\Models\User;
 use App\Models\WalletTransaction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use App\Mail\PasswordResetMail;
 
 class AuthController extends Controller
 {
@@ -291,7 +293,7 @@ class AuthController extends Controller
         ]);
     }
 
-    // POST /api/forgot-password - ขอ reset password
+    // POST /api/forgot-password - ขอ reset password (ส่ง OTP 6 หลักไปเมลจริง)
     public function forgotPassword(Request $request)
     {
         $request->validate([
@@ -301,8 +303,8 @@ class AuthController extends Controller
         // ลบ token เก่า (ถ้ามี)
         DB::table('password_reset_tokens')->where('email', $request->email)->delete();
 
-        // สร้าง token ใหม่
-        $token = \Illuminate\Support\Str::random(64);
+        // สร้าง OTP 6 หลัก
+        $token = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         DB::table('password_reset_tokens')->insert([
             'email' => $request->email,
@@ -310,11 +312,14 @@ class AuthController extends Controller
             'created_at' => now(),
         ]);
 
-        // ในระบบจริงจะส่ง email ให้ user — ตอนนี้คืน token กลับมาให้ frontend
+        // ส่งเมลจริง
+        Mail::to($request->email)->send(new PasswordResetMail(
+            token: $token,
+            email: $request->email,
+        ));
+
         return response()->json([
-            'message' => 'Password reset token generated',
-            'token' => $token,
-            'note' => 'In production, this token would be sent via email',
+            'message' => 'Password reset code has been sent to your email.',
         ]);
     }
 
