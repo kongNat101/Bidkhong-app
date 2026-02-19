@@ -68,7 +68,7 @@ class Product extends Model
     {
         $price = (int) $this->buyout_price;
         $digits = strlen((string) $price);
-        $increment = (int) pow(10, max($digits - 2, 0));
+        $increment = (int) pow(10, max($digits - 1, 0));
 
         return max($increment, 1);
     }
