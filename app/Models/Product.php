@@ -33,6 +33,8 @@ class Product extends Model
         'buyout_price' => 'decimal:2',
     ];
 
+    protected $appends = ['tag'];
+
     public function user()
     {
         return $this->belongsTo(User::class);
@@ -61,6 +63,31 @@ class Product extends Model
     public function images()
     {
         return $this->hasMany(ProductImage::class)->orderBy('sort_order');
+    }
+
+    // คำนวณ tag สถานะสินค้า (Priority: Hot > Ending > Incoming > Default)
+    public function getTagAttribute(): string
+    {
+        // Hot: มี bids >= 10 ครั้ง
+        $bidCount = $this->bids_count ?? $this->bids()->count();
+        if ($bidCount >= 10) {
+            return 'hot';
+        }
+
+        // Ending: เหลือเวลาประมูล <= 1 ชั่วโมง (และยังไม่หมดเวลา)
+        if ($this->status === 'active' && $this->auction_end_time) {
+            $minutesLeft = now()->diffInMinutes($this->auction_end_time, false);
+            if ($minutesLeft > 0 && $minutesLeft <= 60) {
+                return 'ending';
+            }
+        }
+
+        // Incoming: ลงขายไม่เกิน 24 ชั่วโมง
+        if ($this->created_at && $this->created_at->diffInHours(now()) <= 24) {
+            return 'incoming';
+        }
+
+        return 'default';
     }
 
     // คำนวณ min bid increment จาก buyout_price (ลดลง 1 หลัก)

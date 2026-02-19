@@ -10,7 +10,7 @@ class ProductController extends Controller
     //GET /api/products = ดูรายละเอียดสินค้า (พร้อม search, filter, sort)
     public function index(Request $request)
     {
-        $query = Product::with('images');
+        $query = Product::with('images')->withCount('bids');
 
         // 🔍 ค้นหาตามชื่อหรือรายละเอียด
         $query->when($request->search, function ($q, $search) {
@@ -51,6 +51,23 @@ class ProductController extends Controller
             $q->where('location', 'like', "%{$location}%");
         });
 
+        // 🏷 กรองตาม tag (hot, ending, incoming)
+        $query->when($request->tag, function ($q, $tag) {
+            switch ($tag) {
+                case 'hot':
+                    $q->has('bids', '>=', 10);
+                    break;
+                case 'ending':
+                    $q->where('status', 'active')
+                      ->where('auction_end_time', '<=', now()->addHour())
+                      ->where('auction_end_time', '>', now());
+                    break;
+                case 'incoming':
+                    $q->where('created_at', '>=', now()->subDay());
+                    break;
+            }
+        });
+
         // 🔄 Sort
         switch ($request->sort) {
             case 'price_asc':
@@ -76,7 +93,7 @@ class ProductController extends Controller
     //GET /api/products/{id} = ดูรายละเอียดสินค้าแค่ชิ้นเดียว
     public function show($id)
     {
-        $product = Product::with('images')->find($id);
+        $product = Product::with('images')->withCount('bids')->find($id);
 
         if (!$product) {
             return response()->json(['message' => 'Product not found'], 404);
