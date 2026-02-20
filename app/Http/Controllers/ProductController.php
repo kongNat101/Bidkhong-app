@@ -10,7 +10,7 @@ class ProductController extends Controller
     //GET /api/products = ดูรายละเอียดสินค้า (พร้อม search, filter, sort)
     public function index(Request $request)
     {
-        $query = Product::with('images')->withCount('bids');
+        $query = Product::with(['images', 'user:id,name,phone_number'])->withCount('bids');
 
         // 🔍 ค้นหาตามชื่อหรือรายละเอียด
         $query->when($request->search, function ($q, $search) {
@@ -51,7 +51,7 @@ class ProductController extends Controller
             $q->where('location', 'like', "%{$location}%");
         });
 
-        // 🏷 กรองตาม tag (hot, ending, incoming)
+        // 🏷 กรองตาม tag (hot, ending, incoming, ended)
         $query->when($request->tag, function ($q, $tag) {
             switch ($tag) {
                 case 'hot':
@@ -64,6 +64,9 @@ class ProductController extends Controller
                     break;
                 case 'incoming':
                     $q->where('created_at', '>=', now()->subDay());
+                    break;
+                case 'ended':
+                    $q->where('auction_end_time', '<', now());
                     break;
             }
         });
@@ -93,15 +96,36 @@ class ProductController extends Controller
     //GET /api/products/{id} = ดูรายละเอียดสินค้าแค่ชิ้นเดียว
     public function show($id)
     {
-        $product = Product::with('images')->withCount('bids')->find($id);
+        $product = Product::with(['images', 'user:id,name,phone_number'])->withCount('bids')->find($id);
 
         if (!$product) {
             return response()->json(['message' => 'Product not found'], 404);
         }
 
         $response = $product->toArray();
-        $response['bid_increment'] = $product->getBidIncrement();
-        $response['minimum_bid'] = $product->current_price + $product->getBidIncrement();
+
+        // ข้อมูลคนขาย
+        $response['seller'] = [
+            'name' => $product->user->name,
+            'phone_number' => $product->user->phone_number,
+        ];
+
+        // ข้อมูล bids
+        $response['total_bids'] = $product->bids_count;
+        $response['latest_bidders'] = $product->bids()
+            ->with('user:id,name')
+            ->orderByDesc('time')
+            ->take(5)
+            ->get()
+            ->map(fn($bid) => [
+                'name' => $bid->user->name,
+                'price' => $bid->price,
+                'time' => $bid->time,
+            ]);
+
+        // bid increment + minimum bid
+        $response['bid_increment'] = $product->bid_increment;
+        $response['minimum_bid'] = $product->current_price + $product->bid_increment;
 
         return response()->json($response);
     }
@@ -113,16 +137,17 @@ class ProductController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'starting_price' => ['required', 'numeric', 'min:0'],
-            'min_price' => ['nullable', 'numeric', 'min:0'],
+            'bid_increment' => ['nullable', 'numeric', 'min:1'],
             'buyout_price' => ['nullable', 'numeric', 'min:0'],
+            'auction_start_time' => ['nullable', 'date', 'after_or_equal:now'],
             'auction_end_time' => ['nullable', 'date', 'after:now', 'required_without:duration'],
             'duration' => ['nullable', 'integer', 'in:1,2,3,4,5', 'required_without:auction_end_time'],
             'category_id' => ['nullable', 'exists:categories,id'],
             'subcategory_id' => ['nullable', 'exists:subcategories,id'],
             'location' => ['nullable', 'string'],
-            'picture' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:5120'],
+            'picture' => ['required', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:5120'],
             'images' => ['nullable', 'array', 'max:8'],
-            'images.*' => ['image', 'mimes:jpeg,png,jpg,gif,webp', 'max:5120'], // แต่ละรูป max 5MB
+            'images.*' => ['image', 'mimes:jpeg,png,jpg,gif,webp', 'max:5120'],
         ]);
 
         // ถ้าส่ง duration → คำนวณ auction_end_time ให้
@@ -131,15 +156,28 @@ class ProductController extends Controller
         }
         unset($validated['duration']);
 
+        // ถ้าไม่ส่ง auction_start_time → default = now()
+        if (!isset($validated['auction_start_time'])) {
+            $validated['auction_start_time'] = now();
+        }
+
+        // ถ้าไม่ส่ง bid_increment → คำนวณจาก buyout_price (ถ้ามี)
+        if (!isset($validated['bid_increment'])) {
+            if (isset($validated['buyout_price']) && $validated['buyout_price'] > 0) {
+                $digits = strlen((string) (int) $validated['buyout_price']);
+                $validated['bid_increment'] = max((int) pow(10, max($digits - 1, 0)), 1);
+            } else {
+                $validated['bid_increment'] = 1;
+            }
+        }
+
         // เพิ่ม user_id และ current_price
         $validated['user_id'] = $request->user()->id;
         $validated['current_price'] = $validated['starting_price'];
 
-        // อัปโหลดรูปหลัก (ถ้ามี) — เก็บแค่ relative path
-        if ($request->hasFile('picture')) {
-            $path = $request->file('picture')->store('products', 'public');
-            $validated['picture'] = $path;
-        }
+        // อัปโหลดรูปหลัก (บังคับ)
+        $path = $request->file('picture')->store('products', 'public');
+        $validated['picture'] = $path;
 
         // ลบ images ออกจาก validated ก่อน create (เพราะไม่ใช่ column ของ products)
         unset($validated['images']);

@@ -49,16 +49,8 @@ class BidController extends Controller
             ], 400);
         }
 
-        // เช็คว่าราคา >= min_price (ถ้ามี)
-        if ($validated['price'] < $product->min_price) {
-            return response()->json([
-                'message' => 'Bid must be at least minimum price',
-                'min_price' => $product->min_price
-            ], 400);
-        }
-
-        // เช็ค min bid increment (คำนวณจาก buyout_price)
-        $bidIncrement = $product->getBidIncrement();
+        // เช็ค bid increment (จำนวนบิดขั้นต่ำ)
+        $bidIncrement = $product->bid_increment ?? 1;
         $minimumBid = $product->current_price + $bidIncrement;
         if ($validated['price'] < $minimumBid) {
             return response()->json([

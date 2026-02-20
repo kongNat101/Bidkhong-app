@@ -17,8 +17,9 @@ class Product extends Model
         'description',
         'starting_price',
         'current_price',
-        'min_price',
+        'bid_increment',
         'buyout_price',
+        'auction_start_time',
         'auction_end_time',
         'location',
         'picture',
@@ -26,10 +27,11 @@ class Product extends Model
     ];
 
     protected $casts = [
+        'auction_start_time' => 'datetime',
         'auction_end_time' => 'datetime',
         'starting_price' => 'decimal:2',
         'current_price' => 'decimal:2',
-        'min_price' => 'decimal:2',
+        'bid_increment' => 'decimal:2',
         'buyout_price' => 'decimal:2',
     ];
 
@@ -65,13 +67,18 @@ class Product extends Model
         return $this->hasMany(ProductImage::class)->orderBy('sort_order');
     }
 
-    // คำนวณ tag สถานะสินค้า (Priority: Hot > Ending > Incoming > Default)
+    // คำนวณ tag สถานะสินค้า (Priority: Hot > Ending > Ended > Incoming > Default)
     public function getTagAttribute(): string
     {
         // Hot: มี bids >= 10 ครั้ง
         $bidCount = $this->bids_count ?? $this->bids()->count();
         if ($bidCount >= 10) {
             return 'hot';
+        }
+
+        // Ended: หมดเวลาประมูลแล้ว
+        if ($this->auction_end_time && $this->auction_end_time->isPast()) {
+            return 'ended';
         }
 
         // Ending: เหลือเวลาประมูล <= 1 ชั่วโมง (และยังไม่หมดเวลา)
@@ -88,15 +95,5 @@ class Product extends Model
         }
 
         return 'default';
-    }
-
-    // คำนวณ min bid increment จาก buyout_price (ลดลง 1 หลัก)
-    public function getBidIncrement(): int
-    {
-        $price = (int) $this->buyout_price;
-        $digits = strlen((string) $price);
-        $increment = (int) pow(10, max($digits - 1, 0));
-
-        return max($increment, 1);
     }
 }

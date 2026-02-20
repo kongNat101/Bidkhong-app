@@ -115,6 +115,10 @@ class ProductSeeder extends Seeder
                     break;
             }
 
+            // คำนวณ bid_increment จาก buyout_price
+            $digits = strlen((string) (int) $buyoutPrice);
+            $bidIncrement = max((int) pow(10, max($digits - 1, 0)), 1);
+
             // สร้าง Product
             $product = Product::create([
                 'user_id' => $seller->id,
@@ -124,8 +128,9 @@ class ProductSeeder extends Seeder
                 'description' => $description,
                 'starting_price' => $startingPrice,
                 'current_price' => $startingPrice,
-                'min_price' => $startingPrice,
+                'bid_increment' => $bidIncrement,
                 'buyout_price' => $buyoutPrice,
+                'auction_start_time' => $createdAt,
                 'auction_end_time' => $auctionEnd,
                 'location' => 'กรุงเทพมหานคร',
                 'status' => 'active',
