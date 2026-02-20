@@ -137,7 +137,7 @@ class ProductController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'starting_price' => ['required', 'numeric', 'min:0'],
-            'bid_increment' => ['nullable', 'numeric', 'min:1'],
+            'bid_increment' => ['required', 'numeric', 'min:1'],
             'buyout_price' => ['nullable', 'numeric', 'min:0'],
             'auction_start_time' => ['nullable', 'date', 'after_or_equal:now'],
             'auction_end_time' => ['nullable', 'date', 'after:now', 'required_without:duration'],
@@ -159,17 +159,6 @@ class ProductController extends Controller
         // ถ้าไม่ส่ง auction_start_time → default = now()
         if (!isset($validated['auction_start_time'])) {
             $validated['auction_start_time'] = now();
-        }
-
-        // ถ้าไม่ส่ง bid_increment → คำนวณจาก buyout_price (ถ้ามี)
-        if (!isset($validated['bid_increment'])) {
-            if (isset($validated['buyout_price']) && $validated['buyout_price'] > 0) {
-                $digits = strlen((string)(int)$validated['buyout_price']);
-                $validated['bid_increment'] = max((int)pow(10, max($digits - 1, 0)), 1);
-            }
-            else {
-                $validated['bid_increment'] = 1;
-            }
         }
 
         // เพิ่ม user_id และ current_price
