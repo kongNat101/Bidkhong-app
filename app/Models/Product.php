@@ -81,16 +81,16 @@ class Product extends Model
             return 'ended';
         }
 
-        // Ending: เหลือเวลาประมูล <= 1 ชั่วโมง (และยังไม่หมดเวลา)
+        // Ending: เหลือเวลาประมูล <= 6 ชั่วโมง (และยังไม่หมดเวลา)
         if ($this->status === 'active' && $this->auction_end_time) {
             $minutesLeft = now()->diffInMinutes($this->auction_end_time, false);
-            if ($minutesLeft > 0 && $minutesLeft <= 60) {
+            if ($minutesLeft > 0 && $minutesLeft <= 360) {
                 return 'ending';
             }
         }
 
-        // Incoming: ลงขายไม่เกิน 24 ชั่วโมง
-        if ($this->created_at && $this->created_at->diffInHours(now()) <= 24) {
+        // Incoming: สินค้าที่ลงแล้วแต่ยังไม่ถึงเวลาเริ่มประมูล (auction_start_time ยังไม่ถึง)
+        if ($this->auction_start_time && $this->auction_start_time->isFuture()) {
             return 'incoming';
         }
 

@@ -59,11 +59,11 @@ class ProductController extends Controller
                     break;
                 case 'ending':
                     $q->where('status', 'active')
-                      ->where('auction_end_time', '<=', now()->addHour())
-                      ->where('auction_end_time', '>', now());
+                        ->where('auction_end_time', '<=', now()->addHours(6))
+                        ->where('auction_end_time', '>', now());
                     break;
                 case 'incoming':
-                    $q->where('created_at', '>=', now()->subDay());
+                    $q->where('auction_start_time', '>', now());
                     break;
                 case 'ended':
                     $q->where('auction_end_time', '<', now());
@@ -118,10 +118,10 @@ class ProductController extends Controller
             ->take(5)
             ->get()
             ->map(fn($bid) => [
-                'name' => $bid->user->name,
-                'price' => $bid->price,
-                'time' => $bid->time,
-            ]);
+        'name' => $bid->user->name,
+        'price' => $bid->price,
+        'time' => $bid->time,
+        ]);
 
         // bid increment + minimum bid
         $response['bid_increment'] = $product->bid_increment;
@@ -164,9 +164,10 @@ class ProductController extends Controller
         // ถ้าไม่ส่ง bid_increment → คำนวณจาก buyout_price (ถ้ามี)
         if (!isset($validated['bid_increment'])) {
             if (isset($validated['buyout_price']) && $validated['buyout_price'] > 0) {
-                $digits = strlen((string) (int) $validated['buyout_price']);
-                $validated['bid_increment'] = max((int) pow(10, max($digits - 1, 0)), 1);
-            } else {
+                $digits = strlen((string)(int)$validated['buyout_price']);
+                $validated['bid_increment'] = max((int)pow(10, max($digits - 1, 0)), 1);
+            }
+            else {
                 $validated['bid_increment'] = 1;
             }
         }
