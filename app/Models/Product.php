@@ -35,7 +35,7 @@ class Product extends Model
         'buyout_price' => 'decimal:2',
     ];
 
-    protected $appends = ['tag'];
+    protected $appends = ['tag', 'is_certified'];
 
     public function user()
     {
@@ -65,6 +65,17 @@ class Product extends Model
     public function images()
     {
         return $this->hasMany(ProductImage::class)->orderBy('sort_order');
+    }
+
+    public function certificate()
+    {
+        return $this->hasOne(ProductCertificate::class);
+    }
+
+    // ใบเซอร์ผ่านการตรวจสอบจาก admin หรือไม่
+    public function getIsCertifiedAttribute(): bool
+    {
+        return $this->certificate && $this->certificate->status === 'approved';
     }
 
     // คำนวณ tag สถานะสินค้า (Priority: Hot > Ending > Ended > Incoming > Default)

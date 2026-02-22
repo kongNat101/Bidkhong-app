@@ -11,6 +11,7 @@ use App\Http\Controllers\PostAuctionController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\ReviewController;
 
 // Auth Routes (ไม่ต้อง login) - Rate limited to 10 requests per minute
 Route::middleware('throttle:10,1')->group(function () {
@@ -31,6 +32,9 @@ Route::middleware('throttle:60,1')->group(function () {
     Route::get('/categories', [CategoryController::class , 'index']);
     Route::get('/categories/{id}', [CategoryController::class , 'show']);
     Route::get('/subcategories', [CategoryController::class , 'subcategories']);
+
+    // Seller Reviews (public)
+    Route::get('/users/{id}/reviews', [ReviewController::class , 'getSellerReviews']);
 });
 
 // Protected Routes (ต้อง login) - Rate limited to 100 requests per minute
@@ -61,8 +65,6 @@ Route::middleware(['auth:sanctum', 'throttle:100,1'])->group(function () {
     // Orders
     Route::get('/users/me/orders', [OrderController::class , 'myOrders']);
     Route::post('/products/{id}/close', [OrderController::class , 'closeAuction']);
-    Route::patch('/orders/{id}/verify', [OrderController::class , 'verifyOrder']);
-
     // Post-Auction (confirm → ship → receive → dispute)
     Route::post('/orders/{id}/confirm', [PostAuctionController::class , 'confirm']);
     Route::get('/orders/{id}/detail', [PostAuctionController::class , 'detail']);
@@ -77,25 +79,33 @@ Route::middleware(['auth:sanctum', 'throttle:100,1'])->group(function () {
     Route::patch('/notifications/{id}/read', [NotificationController::class , 'markAsRead']);
 
     // Reports
-    Route::post('/reports', [ReportController::class, 'store']);
-    Route::get('/reports', [ReportController::class, 'index']);
+    Route::post('/reports', [ReportController::class , 'store']);
+    Route::get('/reports', [ReportController::class , 'index']);
+
+    // Reviews
+    Route::post('/orders/{id}/review', [ReviewController::class , 'store']);
 });
 
 // Admin Routes (ต้อง login + เป็น admin) - Rate limited to 100 requests per minute
 Route::middleware(['auth:sanctum', 'admin', 'throttle:100,1'])->prefix('admin')->group(function () {
     // Dashboard
-    Route::get('/dashboard', [AdminController::class, 'dashboard']);
+    Route::get('/dashboard', [AdminController::class , 'dashboard']);
 
     // Reports
-    Route::get('/reports', [AdminController::class, 'reports']);
-    Route::patch('/reports/{id}', [AdminController::class, 'updateReport']);
+    Route::get('/reports', [AdminController::class , 'reports']);
+    Route::patch('/reports/{id}', [AdminController::class , 'updateReport']);
 
     // Disputes
-    Route::get('/disputes', [AdminController::class, 'disputes']);
-    Route::patch('/disputes/{id}/resolve', [AdminController::class, 'resolveDispute']);
+    Route::get('/disputes', [AdminController::class , 'disputes']);
+    Route::patch('/disputes/{id}/resolve', [AdminController::class , 'resolveDispute']);
 
     // Users
-    Route::get('/users', [AdminController::class, 'users']);
-    Route::get('/users/{id}', [AdminController::class, 'userDetail']);
-    Route::post('/users/{id}/ban', [AdminController::class, 'banUser']);
+    Route::get('/users', [AdminController::class , 'users']);
+    Route::get('/users/{id}', [AdminController::class , 'userDetail']);
+    Route::post('/users/{id}/ban', [AdminController::class , 'banUser']);
+
+    // Certificates
+    Route::get('/certificates', [AdminController::class , 'certificates']);
+    Route::get('/certificates/{id}', [AdminController::class , 'viewCertificate']);
+    Route::patch('/certificates/{id}/verify', [AdminController::class , 'verifyCertificate']);
 });

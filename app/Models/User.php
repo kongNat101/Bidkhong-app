@@ -60,11 +60,30 @@ class User extends Authenticatable
 
     public function reports()
     {
-        return $this->hasMany(Report::class, 'reporter_id');
+        return $this->hasMany(Report::class , 'reporter_id');
     }
 
     public function strikes()
     {
         return $this->hasMany(UserStrike::class);
+    }
+
+    // รีวิวที่ได้รับในฐานะผู้ขาย
+    public function receivedReviews()
+    {
+        return $this->hasMany(Review::class , 'seller_id');
+    }
+
+    // คะแนนเฉลี่ยจาก buyer
+    public function getAverageRatingAttribute(): ?float
+    {
+        $avg = $this->receivedReviews()->avg('rating');
+        return $avg ? round($avg, 1) : null;
+    }
+
+    // จำนวนรีวิวทั้งหมด
+    public function getTotalReviewsAttribute(): int
+    {
+        return $this->receivedReviews()->count();
     }
 }

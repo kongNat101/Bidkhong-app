@@ -71,7 +71,7 @@ class OrderController extends Controller
             // อัพเดท bids ที่แพ้ + ส่ง notification
             $losingBids = Bid::where('product_id', $product->id)
                 ->where('id', '!=', $winningBid->id)
-                ->where('status', 'outbid')
+                ->whereIn('status', ['outbid', 'active'])
                 ->get();
 
             foreach ($losingBids as $losingBid) {
@@ -92,7 +92,6 @@ class OrderController extends Controller
                 'seller_id' => $product->user_id,
                 'product_id' => $product->id,
                 'final_price' => $winningBid->price,
-                'o_verified' => false,
                 'status' => 'pending_buyer_confirm',
                 'confirm_deadline' => now()->addHours(48),
             ]);
@@ -126,23 +125,4 @@ class OrderController extends Controller
         ]);
     }
 
-    // PATCH /api/orders/{id}/verify - ยืนยัน order
-    public function verifyOrder(Request $request, $orderId)
-    {
-        $order = Order::findOrFail($orderId);
-
-        // Bug 5: ตรวจสอบว่าเป็นเจ้าของ order (ผู้ซื้อ)
-        if ($order->user_id !== $request->user()->id) {
-            return response()->json([
-                'message' => 'You can only verify your own orders'
-            ], 403);
-        }
-
-        $order->update(['o_verified' => true]);
-
-        return response()->json([
-            'message' => 'Order verified successfully',
-            'order' => $order
-        ]);
-    }
 }

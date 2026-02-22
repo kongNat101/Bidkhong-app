@@ -224,7 +224,6 @@ class PostAuctionController extends Controller
             // อัปเดท order
             $order->status = 'completed';
             $order->received_at = now();
-            $order->o_verified = true;
             $order->save();
 
             // โอนเงินจาก escrow ให้ผู้ขาย

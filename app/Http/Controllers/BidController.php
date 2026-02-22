@@ -180,7 +180,7 @@ class BidController extends Controller
             if ($product->status === 'sold' || $product->status === 'closed') {
                 // ประมูลจบแล้ว — ดูว่าใครชนะ
                 $highestBid = Bid::where('product_id', $product->id)
-                    ->orderBy('amount', 'desc')
+                    ->orderBy('price', 'desc')
                     ->first();
 
                 $bid->bid_status = ($highestBid && $highestBid->user_id === $userId) ? 'won' : 'lost';
@@ -188,7 +188,7 @@ class BidController extends Controller
             else {
                 // ยังประมูลอยู่ — ดูว่า bid นี้สูงสุดไหม
                 $highestBid = Bid::where('product_id', $product->id)
-                    ->orderBy('amount', 'desc')
+                    ->orderBy('price', 'desc')
                     ->first();
 
                 $bid->bid_status = ($highestBid && $highestBid->user_id === $userId) ? 'winning' : 'outbid';
@@ -352,7 +352,6 @@ class BidController extends Controller
                 'seller_id' => $product->user_id,
                 'product_id' => $product->id,
                 'final_price' => $product->buyout_price,
-                'o_verified' => false,
                 'status' => 'pending_buyer_confirm',
                 'confirm_deadline' => now()->addHours(48),
             ]);

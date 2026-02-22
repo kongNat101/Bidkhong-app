@@ -9,9 +9,11 @@ use App\Models\Report;
 use App\Models\Dispute;
 use App\Models\UserStrike;
 use App\Models\Notification;
+use App\Models\ProductCertificate;
 use App\Models\WalletTransaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class AdminController extends Controller
 {
@@ -25,10 +27,11 @@ class AdminController extends Controller
             'active_auctions' => Product::where('status', 'active')->count(),
             'open_disputes' => Dispute::where('status', 'open')->count(),
             'pending_reports' => Report::where('status', 'pending')->count(),
+            'pending_certificates' => ProductCertificate::where('status', 'pending')->count(),
             'recent_orders' => Order::with(['product:id,name', 'user:id,name', 'seller:id,name'])
-                ->orderBy('created_at', 'desc')
-                ->take(10)
-                ->get(),
+            ->orderBy('created_at', 'desc')
+            ->take(10)
+            ->get(),
         ]);
     }
 
@@ -129,7 +132,8 @@ class AdminController extends Controller
                 $this->refundEscrow($order);
                 $order->status = 'cancelled';
                 $order->save();
-            } else {
+            }
+            else {
                 // จ่ายเงิน escrow ให้ seller
                 $this->releaseEscrow($order);
                 $order->status = 'completed';
@@ -174,7 +178,7 @@ class AdminController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
@@ -296,5 +300,79 @@ class AdminController extends Controller
                 'balance_after' => $sellerWallet->balance_available,
             ]);
         }
+    }
+
+    // === Certificate Management ===
+
+    // GET /api/admin/certificates - ดู certificates ทั้งหมด
+    public function certificates(Request $request)
+    {
+        $query = ProductCertificate::with([
+            'product:id,name,user_id',
+            'product.user:id,name,email',
+            'verifier:id,name',
+        ]);
+
+        // กรองตาม status (?status=pending)
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $certificates = $query->orderByRaw("FIELD(status, 'pending', 'approved', 'rejected')")
+            ->orderBy('created_at', 'desc')
+            ->paginate(20);
+
+        return response()->json($certificates);
+    }
+
+    // GET /api/admin/certificates/{id} - ดู/ดาวน์โหลดไฟล์ certificate
+    public function viewCertificate($id)
+    {
+        $cert = ProductCertificate::findOrFail($id);
+
+        if (!Storage::disk('public')->exists($cert->file_path)) {
+            return response()->json(['message' => 'Certificate file not found'], 404);
+        }
+
+        return response()->json([
+            'certificate' => $cert->load(['product:id,name,user_id', 'product.user:id,name']),
+            'download_url' => asset('storage/' . $cert->file_path),
+        ]);
+    }
+
+    // PATCH /api/admin/certificates/{id}/verify - อนุมัติ/ปฏิเสธ certificate
+    public function verifyCertificate(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'status' => ['required', 'string', 'in:approved,rejected'],
+            'admin_note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $cert = ProductCertificate::with('product')->findOrFail($id);
+
+        $cert->update([
+            'status' => $validated['status'],
+            'admin_note' => $validated['admin_note'] ?? null,
+            'verified_by' => $request->user()->id,
+            'verified_at' => now(),
+        ]);
+
+        // แจ้งเตือนเจ้าของสินค้า
+        $statusText = $validated['status'] === 'approved'
+            ? 'ผ่านการตรวจสอบแล้ว! สินค้าของคุณได้รับแท็ก Certified แล้ว'
+            : 'ไม่ผ่านการตรวจสอบ';
+
+        Notification::create([
+            'user_id' => $cert->product->user_id,
+            'type' => 'system',
+            'title' => 'Certificate ' . $validated['status'],
+            'message' => "ใบเซอร์สำหรับ {$cert->product->name}: {$statusText}",
+            'product_id' => $cert->product_id,
+        ]);
+
+        return response()->json([
+            'message' => 'Certificate ' . $validated['status'] . ' successfully.',
+            'certificate' => $cert->fresh(['product:id,name', 'verifier:id,name']),
+        ]);
     }
 }

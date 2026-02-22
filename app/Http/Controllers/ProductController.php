@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Models\ProductCertificate;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
@@ -127,6 +129,15 @@ class ProductController extends Controller
         $response['bid_increment'] = $product->bid_increment;
         $response['minimum_bid'] = $product->current_price + $product->bid_increment;
 
+        // ข้อมูล certificate
+        $response['is_certified'] = $product->is_certified;
+        $response['certificate_status'] = $product->certificate?->status;
+
+        // ข้อมูล seller rating
+        $seller = $product->user;
+        $response['seller']['average_rating'] = $seller->average_rating;
+        $response['seller']['total_reviews'] = $seller->total_reviews;
+
         return response()->json($response);
     }
 
@@ -148,6 +159,7 @@ class ProductController extends Controller
             'picture' => ['required', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:5120'],
             'images' => ['nullable', 'array', 'max:8'],
             'images.*' => ['image', 'mimes:jpeg,png,jpg,gif,webp', 'max:5120'],
+            'certificate' => ['nullable', 'file', 'mimes:pdf,jpeg,png,jpg', 'max:10240'], // ใบเซอร์ max 10MB
         ]);
 
         // ถ้าส่ง duration → คำนวณ auction_end_time ให้
@@ -187,6 +199,21 @@ class ProductController extends Controller
 
         // Load images relationship
         $product->load('images');
+
+        // อัปโหลดใบเซอร์ (optional)
+        if ($request->hasFile('certificate')) {
+            $certFile = $request->file('certificate');
+            $certPath = $certFile->store('certificates', 'public');
+
+            ProductCertificate::create([
+                'product_id' => $product->id,
+                'file_path' => $certPath,
+                'original_name' => $certFile->getClientOriginalName(),
+                'status' => 'pending',
+            ]);
+
+            $product->load('certificate');
+        }
 
         return response()->json($product, 201);
     }
