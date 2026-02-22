@@ -81,6 +81,7 @@ Route::middleware(['auth:sanctum', 'throttle:100,1'])->group(function () {
     // Reports
     Route::post('/reports', [ReportController::class , 'store']);
     Route::get('/reports', [ReportController::class , 'index']);
+    Route::get('/reports/{id}', [ReportController::class , 'show']);
 
     // Reviews
     Route::post('/orders/{id}/review', [ReviewController::class , 'store']);
@@ -91,13 +92,9 @@ Route::middleware(['auth:sanctum', 'admin', 'throttle:100,1'])->prefix('admin')-
     // Dashboard
     Route::get('/dashboard', [AdminController::class , 'dashboard']);
 
-    // Reports
+    // Reports + Disputes (รวมเป็นระบบเดียว)
     Route::get('/reports', [AdminController::class , 'reports']);
     Route::patch('/reports/{id}', [AdminController::class , 'updateReport']);
-
-    // Disputes
-    Route::get('/disputes', [AdminController::class , 'disputes']);
-    Route::patch('/disputes/{id}/resolve', [AdminController::class , 'resolveDispute']);
 
     // Users
     Route::get('/users', [AdminController::class , 'users']);

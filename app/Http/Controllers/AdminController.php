@@ -6,7 +6,6 @@ use App\Models\User;
 use App\Models\Product;
 use App\Models\Order;
 use App\Models\Report;
-use App\Models\Dispute;
 use App\Models\UserStrike;
 use App\Models\Notification;
 use App\Models\ProductCertificate;
@@ -25,23 +24,27 @@ class AdminController extends Controller
             'total_products' => Product::count(),
             'total_orders' => Order::count(),
             'active_auctions' => Product::where('status', 'active')->count(),
-            'open_disputes' => Dispute::where('status', 'open')->count(),
-            'pending_reports' => Report::where('status', 'pending')->count(),
+            'open_disputes' => Report::where('type', 'dispute')->where('status', 'open')->count(),
+            'pending_reports' => Report::where('type', '!=', 'dispute')->where('status', 'pending')->count(),
             'pending_certificates' => ProductCertificate::where('status', 'pending')->count(),
             'recent_orders' => Order::with(['product:id,name', 'user:id,name', 'seller:id,name'])
-            ->orderBy('created_at', 'desc')
-            ->take(10)
-            ->get(),
+                ->orderBy('created_at', 'desc')
+                ->take(10)
+                ->get(),
         ]);
     }
 
-    // GET /api/admin/reports - ดู reports ทั้งหมด
+    // GET /api/admin/reports - ดู reports + disputes ทั้งหมด (รวมเป็นระบบเดียว)
     public function reports(Request $request)
     {
         $query = Report::with([
             'reporter:id,name,email',
             'reportedUser:id,name,email',
             'reportedProduct:id,name',
+            'order.product:id,name',
+            'order.user:id,name',
+            'order.seller:id,name',
+            'repliedBy:id,name',
         ]);
 
         // กรองตาม status (?status=pending)
@@ -49,31 +52,75 @@ class AdminController extends Controller
             $query->where('status', $request->status);
         }
 
+        // กรองตาม type (?type=dispute)
+        if ($request->has('type')) {
+            $query->where('type', $request->type);
+        }
+
         $reports = $query->orderBy('created_at', 'desc')->get();
 
         return response()->json($reports);
     }
 
-    // PATCH /api/admin/reports/{id} - อัปเดต report
+    // PATCH /api/admin/reports/{id} - อัปเดต report หรือ resolve dispute
     public function updateReport(Request $request, $id)
     {
+        $report = Report::findOrFail($id);
+
+        if ($report->isDispute()) {
+            return $this->handleDisputeUpdate($request, $report);
+        }
+
+        return $this->handleReportUpdate($request, $report);
+    }
+
+    // === จัดการ Report ทั่วไป ===
+    private function handleReportUpdate(Request $request, Report $report)
+    {
         $validated = $request->validate([
-            'status' => ['required', 'string', 'in:pending,reviewing,resolved,dismissed'],
+            'status' => ['nullable', 'string', 'in:pending,reviewing,resolved,dismissed'],
             'admin_note' => ['nullable', 'string', 'max:1000'],
+            'admin_reply' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $report = Report::findOrFail($id);
-        $report->update($validated);
+        $updateData = [];
+
+        if (isset($validated['status'])) {
+            $updateData['status'] = $validated['status'];
+
+            // บันทึก timeline timestamps
+            if ($validated['status'] === 'reviewing' && !$report->reviewing_at) {
+                $updateData['reviewing_at'] = now();
+            }
+            if (in_array($validated['status'], ['resolved', 'dismissed']) && !$report->resolved_at) {
+                $updateData['resolved_at'] = now();
+            }
+        }
+
+        if (isset($validated['admin_note'])) {
+            $updateData['admin_note'] = $validated['admin_note'];
+        }
+
+        // Admin reply
+        if (isset($validated['admin_reply'])) {
+            $updateData['admin_reply'] = $validated['admin_reply'];
+            $updateData['admin_reply_at'] = now();
+            $updateData['admin_reply_by'] = $request->user()->id;
+        }
+
+        $report->update($updateData);
 
         // แจ้งเตือนคนที่ report
-        Notification::create([
-            'user_id' => $report->reporter_id,
-            'type' => 'system',
-            'title' => 'Report updated',
-            'message' => "Your report has been updated to: {$validated['status']}.",
-        ]);
+        if (isset($validated['status'])) {
+            Notification::create([
+                'user_id' => $report->reporter_id,
+                'type' => 'system',
+                'title' => 'Report updated',
+                'message' => "Your report ({$report->report_code}) has been updated to: {$validated['status']}.",
+            ]);
+        }
 
-        $report->load(['reporter:id,name,email', 'reportedUser:id,name,email']);
+        $report->load(['reporter:id,name,email', 'reportedUser:id,name,email', 'repliedBy:id,name']);
 
         return response()->json([
             'message' => 'Report updated successfully.',
@@ -81,90 +128,98 @@ class AdminController extends Controller
         ]);
     }
 
-    // GET /api/admin/disputes - ดู disputes ทั้งหมด
-    public function disputes(Request $request)
-    {
-        $query = Dispute::with([
-            'order.product:id,name',
-            'order.user:id,name',
-            'order.seller:id,name',
-            'reporter:id,name,email',
-        ]);
-
-        // กรองตาม status (?status=open)
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
-        }
-
-        $disputes = $query->orderBy('created_at', 'desc')->get();
-
-        return response()->json($disputes);
-    }
-
-    // PATCH /api/admin/disputes/{id}/resolve - ตัดสิน dispute
-    public function resolveDispute(Request $request, $id)
+    // === จัดการ Dispute (พร้อม escrow) ===
+    private function handleDisputeUpdate(Request $request, Report $report)
     {
         $validated = $request->validate([
-            'status' => ['required', 'string', 'in:resolved_buyer,resolved_seller'],
+            'status' => ['nullable', 'string', 'in:open,resolved_buyer,resolved_seller'],
             'admin_note' => ['nullable', 'string', 'max:1000'],
+            'admin_reply' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $dispute = Dispute::with(['order.product', 'order.user.wallet', 'order.seller.wallet'])->findOrFail($id);
+        // ถ้าเป็นการ resolve dispute (มี escrow)
+        if (isset($validated['status']) && in_array($validated['status'], ['resolved_buyer', 'resolved_seller'])) {
+            if ($report->status !== 'open') {
+                return response()->json([
+                    'message' => 'This dispute has already been resolved.',
+                ], 422);
+            }
 
-        if ($dispute->status !== 'open') {
-            return response()->json([
-                'message' => 'This dispute has already been resolved.',
-            ], 422);
+            $report->load(['order.product', 'order.user.wallet', 'order.seller.wallet']);
+            $order = $report->order;
+
+            DB::transaction(function () use ($report, $order, $validated, $request) {
+                $updateData = [
+                    'status' => $validated['status'],
+                    'admin_note' => $validated['admin_note'] ?? $report->admin_note,
+                    'resolved_at' => now(),
+                ];
+
+                if (isset($validated['admin_reply'])) {
+                    $updateData['admin_reply'] = $validated['admin_reply'];
+                    $updateData['admin_reply_at'] = now();
+                    $updateData['admin_reply_by'] = $request->user()->id;
+                }
+
+                $report->update($updateData);
+
+                if ($validated['status'] === 'resolved_buyer') {
+                    $this->refundEscrow($order);
+                    $order->status = 'cancelled';
+                    $order->save();
+                } else {
+                    $this->releaseEscrow($order);
+                    $order->status = 'completed';
+                    $order->save();
+                }
+
+                // แจ้งเตือนทั้ง 2 ฝั่ง
+                $resultText = $validated['status'] === 'resolved_buyer'
+                    ? 'resolved in favor of the buyer. Refund has been processed.'
+                    : 'resolved in favor of the seller. Payment has been released.';
+
+                Notification::create([
+                    'user_id' => $order->user_id,
+                    'type' => 'order',
+                    'title' => 'Dispute resolved',
+                    'message' => "The dispute for {$order->product->name} has been {$resultText}",
+                    'product_id' => $order->product_id,
+                ]);
+
+                Notification::create([
+                    'user_id' => $order->seller_id,
+                    'type' => 'order',
+                    'title' => 'Dispute resolved',
+                    'message' => "The dispute for {$order->product->name} has been {$resultText}",
+                    'product_id' => $order->product_id,
+                ]);
+            });
+        } else {
+            // อัปเดตอื่นๆ (admin_note, admin_reply) ที่ไม่ใช่ resolve
+            $updateData = [];
+            if (isset($validated['admin_note'])) {
+                $updateData['admin_note'] = $validated['admin_note'];
+            }
+            if (isset($validated['admin_reply'])) {
+                $updateData['admin_reply'] = $validated['admin_reply'];
+                $updateData['admin_reply_at'] = now();
+                $updateData['admin_reply_by'] = $request->user()->id;
+            }
+            if (!empty($updateData)) {
+                $report->update($updateData);
+            }
         }
 
-        $order = $dispute->order;
-
-        DB::transaction(function () use ($dispute, $order, $validated) {
-            // อัปเดต dispute
-            $dispute->update([
-                'status' => $validated['status'],
-                'admin_note' => $validated['admin_note'] ?? null,
-                'resolved_at' => now(),
-            ]);
-
-            if ($validated['status'] === 'resolved_buyer') {
-                // คืนเงิน escrow ให้ buyer
-                $this->refundEscrow($order);
-                $order->status = 'cancelled';
-                $order->save();
-            }
-            else {
-                // จ่ายเงิน escrow ให้ seller
-                $this->releaseEscrow($order);
-                $order->status = 'completed';
-                $order->save();
-            }
-
-            // แจ้งเตือนทั้ง 2 ฝั่ง
-            $resultText = $validated['status'] === 'resolved_buyer'
-                ? 'resolved in favor of the buyer. Refund has been processed.'
-                : 'resolved in favor of the seller. Payment has been released.';
-
-            Notification::create([
-                'user_id' => $order->user_id,
-                'type' => 'order',
-                'title' => 'Dispute resolved',
-                'message' => "The dispute for {$order->product->name} has been {$resultText}",
-                'product_id' => $order->product_id,
-            ]);
-
-            Notification::create([
-                'user_id' => $order->seller_id,
-                'type' => 'order',
-                'title' => 'Dispute resolved',
-                'message' => "The dispute for {$order->product->name} has been {$resultText}",
-                'product_id' => $order->product_id,
-            ]);
-        });
+        $report->load([
+            'reporter:id,name,email',
+            'reportedUser:id,name,email',
+            'order.product:id,name',
+            'repliedBy:id,name',
+        ]);
 
         return response()->json([
-            'message' => 'Dispute resolved successfully.',
-            'dispute' => $dispute->fresh(['order.product', 'reporter:id,name']),
+            'message' => 'Dispute updated successfully.',
+            'report' => $report,
         ]);
     }
 
@@ -242,7 +297,6 @@ class AdminController extends Controller
     {
         $buyerWallet = $order->user->wallet;
         if ($buyerWallet) {
-            // คืนจาก pending ไป available
             $buyerWallet->balance_pending -= $order->final_price;
             $buyerWallet->balance_available += $order->final_price;
             $buyerWallet->save();
@@ -263,7 +317,6 @@ class AdminController extends Controller
     // === Helper: โอนเงิน escrow ให้ seller ===
     private function releaseEscrow(Order $order): void
     {
-        // หัก pending จาก buyer
         $buyerWallet = $order->user->wallet;
         if ($buyerWallet) {
             $buyerWallet->balance_pending -= $order->final_price;
@@ -282,7 +335,6 @@ class AdminController extends Controller
             ]);
         }
 
-        // โอนเข้า wallet ผู้ขาย
         $sellerWallet = $order->seller->wallet;
         if ($sellerWallet) {
             $sellerWallet->balance_available += $order->final_price;

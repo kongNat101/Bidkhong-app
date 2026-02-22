@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
-use App\Models\Dispute;
+use App\Models\Report;
 use App\Models\UserStrike;
 use App\Models\WalletTransaction;
 use App\Models\Notification;
@@ -257,7 +257,7 @@ class PostAuctionController extends Controller
         }
 
         // เช็คว่ายังไม่มี dispute
-        $existing = Dispute::where('order_id', $id)->first();
+        $existing = Report::where('order_id', $id)->where('type', 'dispute')->first();
         if ($existing) {
             return response()->json([
                 'message' => 'A dispute has already been filed for this order'
@@ -281,11 +281,13 @@ class PostAuctionController extends Controller
         }
 
         DB::transaction(function () use ($order, $userId, $validated, $imagePaths) {
-            // สร้าง dispute
-            Dispute::create([
+            // สร้าง dispute (เก็บใน reports table type=dispute)
+            Report::create([
                 'order_id' => $order->id,
                 'reporter_id' => $userId,
-                'reason' => $validated['reason'],
+                'reported_user_id' => $order->seller_id,
+                'type' => 'dispute',
+                'description' => $validated['reason'],
                 'evidence_images' => $imagePaths ?: null,
                 'status' => 'open',
             ]);

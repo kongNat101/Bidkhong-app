@@ -54,7 +54,7 @@ class Order extends Model
 
     public function dispute()
     {
-        return $this->hasOne(Dispute::class);
+        return $this->hasOne(Report::class, 'order_id')->where('type', 'dispute');
     }
 
     // เช็คว่า confirm หมดเวลาหรือยัง

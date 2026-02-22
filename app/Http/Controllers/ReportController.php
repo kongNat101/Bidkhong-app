@@ -57,14 +57,38 @@ class ReportController extends Controller
         ], 201);
     }
 
-    // GET /api/reports - ดู report ที่ตัวเองสร้าง
+    // GET /api/reports - ดู report ที่ตัวเองสร้าง + summary counts
     public function index(Request $request)
     {
-        $reports = Report::where('reporter_id', $request->user()->id)
-            ->with(['reportedUser:id,name', 'reportedProduct:id,name'])
+        $userId = $request->user()->id;
+
+        // นับ summary ตาม status (ไม่รวม disputes)
+        $summary = [
+            'pending' => Report::where('reporter_id', $userId)->where('type', '!=', 'dispute')->where('status', 'pending')->count(),
+            'reviewing' => Report::where('reporter_id', $userId)->where('type', '!=', 'dispute')->where('status', 'reviewing')->count(),
+            'resolved' => Report::where('reporter_id', $userId)->where('type', '!=', 'dispute')->whereIn('status', ['resolved', 'dismissed'])->count(),
+        ];
+
+        $reports = Report::where('reporter_id', $userId)
+            ->where('type', '!=', 'dispute')
+            ->with(['reportedUser:id,name', 'reportedProduct:id,name', 'repliedBy:id,name'])
             ->orderBy('created_at', 'desc')
             ->get();
 
-        return response()->json($reports);
+        return response()->json([
+            'summary' => $summary,
+            'reports' => $reports,
+        ]);
+    }
+
+    // GET /api/reports/{id} - ดูรายละเอียด report + timeline + admin reply
+    public function show(Request $request, $id)
+    {
+        $report = Report::where('reporter_id', $request->user()->id)
+            ->where('type', '!=', 'dispute')
+            ->with(['reportedUser:id,name', 'reportedProduct:id,name', 'repliedBy:id,name'])
+            ->findOrFail($id);
+
+        return response()->json($report);
     }
 }
