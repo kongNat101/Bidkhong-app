@@ -16,7 +16,6 @@ class Wallet extends Model
         'balance_pending',
         'withdraw',
         'deposit',
-        'w_time',
     ];
 
     protected $casts =   [
@@ -25,7 +24,6 @@ class Wallet extends Model
         'balance_pending' => 'decimal:2',
         'withdraw' => 'decimal:2',
         'deposit' => 'decimal:2',
-        'w_time' => 'datetime',
     ];
 
     public function user(){

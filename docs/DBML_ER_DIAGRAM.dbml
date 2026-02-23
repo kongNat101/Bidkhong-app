@@ -1,0 +1,280 @@
+%% ===================================================
+%% BidKhong - Auction Platform ER Diagram (Mermaid)
+%% วาง code นี้ที่ https://mermaid.live
+%% ===================================================
+
+erDiagram
+
+    %% ===================================================
+    %% User & Auth
+    %% ===================================================
+
+    users {
+        bigint id PK
+        varchar name
+        varchar email UK
+        timestamp email_verified_at
+        varchar password
+        varchar phone_number UK
+        enum role "user, admin"
+        varchar profile_image
+        varchar remember_token
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    wallets {
+        bigint id PK
+        bigint user_id FK
+        decimal balance_available
+        decimal balance_total
+        decimal balance_pending
+        decimal withdraw
+        decimal deposit
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    wallet_transactions {
+        bigint id PK
+        bigint user_id FK
+        bigint wallet_id FK
+        enum type "topup, withdraw, bid_placed, bid_refund, auction_won, auction_sold, escrow_hold, escrow_release, escrow_refund"
+        decimal amount
+        varchar description
+        varchar reference_type
+        bigint reference_id
+        decimal balance_after
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    user_strikes {
+        bigint id PK
+        bigint user_id FK
+        varchar reason
+        bigint order_id FK
+        timestamp banned_until
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% ===================================================
+    %% Product & Catalog
+    %% ===================================================
+
+    categories {
+        bigint id PK
+        varchar name
+        text description
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    subcategories {
+        bigint id PK
+        bigint category_id FK
+        varchar name
+        text description
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    products {
+        bigint id PK
+        bigint user_id FK
+        bigint category_id FK
+        bigint subcategory_id FK
+        varchar name
+        text description
+        varchar location
+        decimal starting_price
+        decimal bid_increment
+        decimal buyout_price
+        decimal current_price
+        varchar picture
+        timestamp auction_start_time
+        timestamp auction_end_time
+        enum status "active, completed, cancelled"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    product_images {
+        bigint id PK
+        bigint product_id FK
+        varchar image_url
+        int sort_order
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    product_certificates {
+        bigint id PK
+        bigint product_id FK
+        varchar file_path
+        varchar original_name
+        enum status "pending, approved, rejected"
+        text admin_note
+        bigint verified_by FK
+        timestamp verified_at
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% ===================================================
+    %% Auction & Order
+    %% ===================================================
+
+    bids {
+        bigint id PK
+        bigint user_id FK
+        bigint product_id FK
+        decimal price
+        timestamp time
+        enum status "active, outbid, won, lost"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    orders {
+        bigint id PK
+        bigint user_id FK
+        bigint seller_id FK
+        bigint product_id FK
+        decimal final_price
+        enum status "pending_confirm, pending_buyer_confirm, confirmed, shipped, completed, disputed, cancelled"
+        timestamp buyer_confirmed_at
+        timestamp shipped_at
+        timestamp received_at
+        timestamp confirm_deadline
+        timestamp ship_deadline
+        timestamp receive_deadline
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    order_confirmations {
+        bigint id PK
+        bigint order_id FK
+        bigint user_id FK
+        enum role "buyer, seller"
+        varchar phone
+        varchar line_id
+        varchar facebook
+        text note
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% ===================================================
+    %% Support & Admin
+    %% ===================================================
+
+    reports {
+        bigint id PK
+        bigint reporter_id FK
+        bigint reported_user_id FK
+        bigint reported_product_id FK
+        bigint order_id FK
+        enum type "scam, fake_product, harassment, inappropriate_content, other, dispute"
+        text description
+        json evidence_images
+        enum status "pending, reviewing, resolved, dismissed, open, resolved_buyer, resolved_seller"
+        text admin_note
+        timestamp resolved_at
+        timestamp reviewing_at
+        text admin_reply
+        timestamp admin_reply_at
+        bigint admin_reply_by FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    reviews {
+        bigint id PK
+        bigint order_id FK "UK"
+        bigint reviewer_id FK
+        bigint seller_id FK
+        tinyint rating
+        text comment
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    notifications {
+        bigint id PK
+        bigint user_id FK
+        enum type "outbid, won, lost, sold, new_bid, order, system"
+        varchar title
+        text message
+        bigint product_id FK
+        boolean is_read
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% ===================================================
+    %% System Tables (Laravel)
+    %% ===================================================
+
+    personal_access_tokens {
+        bigint id PK
+        varchar tokenable_type
+        bigint tokenable_id
+        varchar name
+        varchar token UK
+        text abilities
+        timestamp last_used_at
+        timestamp expires_at
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    password_reset_tokens {
+        varchar email PK
+        varchar token
+        timestamp created_at
+    }
+
+    %% ===================================================
+    %% Relationships
+    %% ===================================================
+
+    %% User & Wallet
+    users ||--o{ wallets : "has"
+    users ||--o{ wallet_transactions : "has"
+    wallets ||--o{ wallet_transactions : "has"
+    users ||--o{ user_strikes : "has"
+
+    %% Product & Catalog
+    categories ||--o{ subcategories : "has"
+    categories ||--o{ products : "has"
+    subcategories ||--o{ products : "has"
+    users ||--o{ products : "sells"
+    products ||--o{ product_images : "has"
+    products ||--o{ product_certificates : "has"
+    users ||--o{ product_certificates : "verifies"
+
+    %% Auction & Order
+    users ||--o{ bids : "places"
+    products ||--o{ bids : "receives"
+    users ||--o{ orders : "buys"
+    users ||--o{ orders : "sells"
+    products ||--o{ orders : "has"
+    orders ||--o{ order_confirmations : "has"
+    users ||--o{ order_confirmations : "provides"
+    user_strikes }o--o| orders : "related"
+
+    %% Support & Admin
+    users ||--o{ reports : "reports"
+    users ||--o{ reports : "reported"
+    products ||--o{ reports : "reported"
+    orders ||--o{ reports : "disputed"
+    users ||--o{ reports : "replies"
+    orders ||--|| reviews : "has"
+    users ||--o{ reviews : "writes"
+    users ||--o{ reviews : "receives"
+    users ||--o{ notifications : "receives"
+    products ||--o{ notifications : "related"
+

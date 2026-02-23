@@ -61,6 +61,7 @@ Route::middleware(['auth:sanctum', 'throttle:100,1'])->group(function () {
     Route::post('/products/{id}/buy-now', [BidController::class , 'buyNow']);
     Route::get('/products/{id}/bids', [BidController::class , 'getProductBids']);
     Route::get('/users/me/bids', [BidController::class , 'getUserBids']);
+    Route::get('/users/me/products', [ProductController::class , 'myProducts']);
 
     // Orders
     Route::get('/users/me/orders', [OrderController::class , 'myOrders']);

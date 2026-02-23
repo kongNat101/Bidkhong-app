@@ -218,6 +218,98 @@ class ProductController extends Controller
         return response()->json($product, 201);
     }
 
+    // GET /api/users/me/products — ดูสินค้าที่ตัวเองวางขายทั้งหมด + สถานะกระบวนการ
+    public function myProducts(Request $request)
+    {
+        $query = Product::where('user_id', $request->user()->id)
+            ->with(['images', 'order'])
+            ->withCount('bids');
+
+        // กรองตาม product status (active, completed, cancelled)
+        $query->when($request->status, function ($q, $status) {
+            $q->where('status', $status);
+        });
+
+        $products = $query->orderBy('created_at', 'desc')->paginate(20);
+
+        // เพิ่ม auction_status ให้แต่ละสินค้า
+        $products->getCollection()->transform(function ($product) {
+            $product->auction_status = $this->getAuctionStatus($product);
+            $product->auction_status_label = $this->getAuctionStatusLabel($product->auction_status);
+            return $product;
+        });
+
+        // กรองตาม auction_status (ถ้ามี)
+        if ($request->auction_status) {
+            $filtered = $products->getCollection()->filter(function ($product) use ($request) {
+                return $product->auction_status === $request->auction_status;
+            })->values();
+            $products->setCollection($filtered);
+        }
+
+        return response()->json($products);
+    }
+
+    // คำนวณสถานะกระบวนการของสินค้า
+    private function getAuctionStatus(Product $product): string
+    {
+        // cancelled
+        if ($product->status === 'cancelled') {
+            return 'cancelled';
+        }
+
+        // completed → ดู order status ต่อ
+        if ($product->status === 'completed' && $product->order) {
+            return match ($product->order->status) {
+                'confirmed' => 'pending_shipment',
+                'shipped' => 'shipped',
+                'completed' => 'completed',
+                'disputed' => 'disputed',
+                default => 'sold', // pending_confirm, pending_buyer_confirm
+            };
+        }
+
+        if ($product->status === 'completed') {
+            return 'sold';
+        }
+
+        // active → ดูเวลาประมูล
+        if ($product->auction_start_time && $product->auction_start_time->isFuture()) {
+            return 'incoming';
+        }
+
+        if ($product->auction_end_time && $product->auction_end_time->isPast()) {
+            return 'ended';
+        }
+
+        if ($product->auction_end_time) {
+            $minutesLeft = now()->diffInMinutes($product->auction_end_time, false);
+            if ($minutesLeft > 0 && $minutesLeft <= 360) {
+                return 'ending';
+            }
+        }
+
+        return 'active';
+    }
+
+    // แปลง auction_status เป็นภาษาไทย
+    private function getAuctionStatusLabel(string $status): string
+    {
+        return match ($status) {
+            'incoming' => 'รอเริ่มประมูล',
+            'active' => 'กำลังประมูลอยู่',
+            'ending' => 'ใกล้หมดเวลา',
+            'ended' => 'รอปิดประมูล',
+            'sold' => 'ขายแล้ว (รอยืนยัน)',
+            'pending_shipment' => 'รอส่งของ',
+            'shipped' => 'ส่งของแล้ว รอผู้ซื้อรับ',
+            'completed' => 'จบสมบูรณ์',
+            'disputed' => 'มีข้อพิพาท',
+            'cancelled' => 'ยกเลิก',
+            default => $status,
+        };
+    }
+
     // DELETE /api/products/{id} — ลบสินค้า (เจ้าของเท่านั้น)
     public function destroy(Request $request, $id)
     {

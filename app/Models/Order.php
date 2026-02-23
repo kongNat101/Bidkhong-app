@@ -14,7 +14,6 @@ class Order extends Model
         'seller_id',
         'product_id',
         'final_price',
-        'order_date',
         'status',
         'buyer_confirmed_at',
         'shipped_at',
@@ -26,7 +25,6 @@ class Order extends Model
 
     protected $casts = [
         'final_price' => 'decimal:2',
-        'order_date' => 'datetime',
         'buyer_confirmed_at' => 'datetime',
         'shipped_at' => 'datetime',
         'received_at' => 'datetime',
