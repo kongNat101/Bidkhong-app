@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "BidKhong Auction API",
-    "description": "Complete API collection for BidKhong online auction platform.\nUpdated: 24 Feb 2026 — includes Reviews, Certificates, Reports, Admin Panel.\n\nTotal: 51 endpoints across 12 folders.",
+    "description": "Complete API collection for BidKhong online auction platform.\nUpdated: 19 Mar 2026 — includes Recommendations, Admin Approval, Slip Verify, Anti-sniping, Reviews (rating only), Unban.\n\nTotal: 58 endpoints across 13 folders.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "BidKhong"
   },
@@ -988,22 +988,29 @@
       "name": "💰 Wallet",
       "item": [
         {
-          "name": "Top Up Wallet",
+          "name": "Top Up Wallet (Slip Required)",
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
               {
                 "key": "Accept",
                 "value": "application/json"
               }
             ],
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"amount\": 10000\n}"
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "amount",
+                  "value": "1000",
+                  "type": "text"
+                },
+                {
+                  "key": "slip_image",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
             },
             "url": {
               "raw": "{{base_url}}/wallet/topup",
@@ -1015,7 +1022,7 @@
                 "topup"
               ]
             },
-            "description": "Add funds to wallet. Amount must be > 0.\n\nUpdates: balance_available += amount, balance_total += amount, deposit += amount\nCreates wallet_transaction type: 'topup'"
+            "description": "⚠️ BREAKING CHANGE: ต้องแนบสลิปแล้ว!\n\nBody (form-data): amount (required, min 1) + slip_image (required, JPEG/PNG/JPG, max 5MB)\n\nSlip2Go API verify → verified = เพิ่มเงิน, rejected = ไม่เพิ่ม\nDev mode: ถ้าไม่มี SLIP2GO_API_KEY → auto approve ทุกสลิป"
           },
           "response": []
         },
@@ -1542,7 +1549,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"rating\": 5,\n  \"comment\": \"สินค้าดีมาก ส่งเร็ว ของแท้ แนะนำเลยครับ\"\n}"
+              "raw": "{\n  \"rating\": 5\n}"
             },
             "url": {
               "raw": "{{base_url}}/orders/{{order_id}}/review",
@@ -1555,7 +1562,7 @@
                 "review"
               ]
             },
-            "description": "Buyer reviews seller after order completed.\n\nRules:\n- Only buyer can review\n- Order must be 'completed'\n- 1 review per order (UNIQUE)\n- rating: 1-5 (required)\n- comment: optional (max 1000 chars)"
+            "description": "⚠️ CHANGED: เก็บแค่คะแนนดาว 1-5 (ไม่มี comment แล้ว)\n\nBuyer rates seller after order completed.\n\nRules:\n- Only buyer can review\n- Order must be 'completed'\n- 1 review per order (UNIQUE)\n- rating: 1-5 (required)\n\nAfter review → seller's rating + total_reviews in users table auto-updated"
           },
           "response": []
         },
@@ -1588,7 +1595,76 @@
           "response": []
         }
       ],
-      "description": "Review system — buyer rates seller after completed order (2 endpoints)\nPublic: view seller reviews | Protected: submit review"
+      "description": "Review system — buyer rates seller after completed order (rating 1-5 only, no comment)\nPublic: view seller reviews | Protected: submit rating"
+    },
+    {
+      "name": "🤖 Recommendations (AI)",
+      "item": [
+        {
+          "name": "Get Personalized Recommendations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/recommendations?limit=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "recommendations"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "🆕 AI แนะนำสินค้าเฉพาะ user จาก bidding history (LightFM)\n\nAuth: Required (ใช้ user token)\nQuery: limit (default 10)\n\nResponse: { source: 'lightfm'|'popular'|'fallback_popular', products: [...] }\n\nFallback: ถ้า AI service ล่ม → ส่งสินค้ายอดนิยมแทนอัตโนมัติ\n\n⚠️ ต้อง train model ก่อน: curl -X POST http://localhost:5001/train"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Similar Products",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/products/{{product_id}}/similar?limit=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products",
+                "{{product_id}}",
+                "similar"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "🆕 สินค้าที่คล้ายกัน (ไม่ต้อง login)\n\nAuth: Not required\nQuery: limit (default 10)\n\nResponse: { source: 'lightfm_similarity'|'fallback_category', products: [...] }\n\nFallback: ถ้า AI service ล่ม → ส่งสินค้า category เดียวกันแทน"
+          },
+          "response": []
+        }
+      ],
+      "description": "🆕 AI Recommendation system (LightFM) — 2 endpoints\nPersonalized recommendations + Similar products\nFallback to popular/category-based when AI unavailable"
     },
     {
       "name": "🛡 Admin Panel",
@@ -1956,9 +2032,165 @@
             "description": "Approve or reject a product certificate.\n\nRequired: status (approved/rejected)\nOptional: admin_note\n\nApproved → product gets 'Certified ✅' badge (is_certified accessor)\nSeller receives notification either way."
           },
           "response": []
+        },
+        {
+          "name": "Get Pending Products",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/products?status=pending",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending"
+                }
+              ]
+            },
+            "description": "🆕 ดูสินค้ารออนุมัติ (default: pending)\n\nQuery: status=pending|rejected\n\nIncludes: user, category, subcategory, images, certificate, bids_count\n\nสินค้าใหม่ทุกชิ้น = status pending → admin ต้อง approve ก่อนถึงจะแสดงใน public"
+          },
+          "response": []
+        },
+        {
+          "name": "Approve Product",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/products/{{product_id}}/approve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "products",
+                "{{product_id}}",
+                "approve"
+              ]
+            },
+            "description": "🆕 อนุมัติสินค้า → status เปลี่ยนเป็น active\n\nOnly works on 'pending' products\nSeller receives notification: สินค้าได้รับการอนุมัติแล้ว"
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Product",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"admin_note\": \"สินค้าไม่ตรงตามเงื่อนไข กรุณาแก้ไขและส่งใหม่\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/products/{{product_id}}/reject",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "products",
+                "{{product_id}}",
+                "reject"
+              ]
+            },
+            "description": "🆕 ปฏิเสธสินค้า → status เปลี่ยนเป็น rejected\n\nRequired: admin_note (เหตุผลที่ปฏิเสธ, max 1000 chars)\nOnly works on 'pending' products\nSeller receives notification with rejection reason"
+          },
+          "response": []
+        },
+        {
+          "name": "Unban User",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/users/{{user_id}}/unban",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "{{user_id}}",
+                "unban"
+              ]
+            },
+            "description": "🆕 ปลดแบน user\n\nSets all active strikes' banned_until = now()\nUser receives notification: บัญชีถูกปลดแบนแล้ว\n\nReturns 422 if user is not currently banned"
+          },
+          "response": []
         }
       ],
-      "description": "Admin panel — requires admin role (9 endpoints)\n\nLogin as admin first, then use admin_token.\nDefault admin: admin@bidkhong.com / admin123"
+      "description": "Admin panel — requires admin role (13 endpoints)\n\n🆕 New: Product Approval (3), Unban (1)\n\nLogin as admin first, then use admin_token.\nDefault admin: admin@bidkhong.com / admin123"
     }
   ]
 }
