@@ -43,10 +43,12 @@ class ProductController extends Controller
             $q->where('current_price', '<=', $maxPrice);
         });
 
-        // 🏷 กรองตาม status (default: active)
-        $query->when($request->status, function ($q, $status) {
-            $q->where('status', $status);
-        });
+        // 🏷 กรองตาม status (default: active — public เห็นแค่ active)
+        if ($request->status && in_array($request->status, ['active', 'completed', 'cancelled'])) {
+            $query->where('status', $request->status);
+        } else {
+            $query->where('status', 'active');
+        }
 
         // 📍 กรองตามสถานที่
         $query->when($request->location, function ($q, $location) {
@@ -173,9 +175,10 @@ class ProductController extends Controller
             $validated['auction_start_time'] = now();
         }
 
-        // เพิ่ม user_id และ current_price
+        // เพิ่ม user_id, current_price และ status = pending (รอ admin อนุมัติ)
         $validated['user_id'] = $request->user()->id;
         $validated['current_price'] = $validated['starting_price'];
+        $validated['status'] = 'pending';
 
         // อัปโหลดรูปหลัก (บังคับ)
         $path = $request->file('picture')->store('products', 'public');
@@ -253,6 +256,16 @@ class ProductController extends Controller
     // คำนวณสถานะกระบวนการของสินค้า
     private function getAuctionStatus(Product $product): string
     {
+        // pending (รอ admin อนุมัติ)
+        if ($product->status === 'pending') {
+            return 'pending';
+        }
+
+        // rejected (admin ปฏิเสธ)
+        if ($product->status === 'rejected') {
+            return 'rejected';
+        }
+
         // cancelled
         if ($product->status === 'cancelled') {
             return 'cancelled';
@@ -273,19 +286,21 @@ class ProductController extends Controller
             return 'sold';
         }
 
-        // active → ดูเวลาประมูล
-        if ($product->auction_start_time && $product->auction_start_time->isFuture()) {
-            return 'incoming';
-        }
+        // active → ดูเวลาประมูล (ต้อง check status === 'active' ก่อน)
+        if ($product->status === 'active') {
+            if ($product->auction_start_time && $product->auction_start_time->isFuture()) {
+                return 'incoming';
+            }
 
-        if ($product->auction_end_time && $product->auction_end_time->isPast()) {
-            return 'ended';
-        }
+            if ($product->auction_end_time && $product->auction_end_time->isPast()) {
+                return 'ended';
+            }
 
-        if ($product->auction_end_time) {
-            $minutesLeft = now()->diffInMinutes($product->auction_end_time, false);
-            if ($minutesLeft > 0 && $minutesLeft <= 360) {
-                return 'ending';
+            if ($product->auction_end_time) {
+                $minutesLeft = now()->diffInMinutes($product->auction_end_time, false);
+                if ($minutesLeft > 0 && $minutesLeft <= 360) {
+                    return 'ending';
+                }
             }
         }
 
@@ -296,6 +311,8 @@ class ProductController extends Controller
     private function getAuctionStatusLabel(string $status): string
     {
         return match ($status) {
+            'pending' => 'รออนุมัติจากแอดมิน',
+            'rejected' => 'ถูกปฏิเสธ',
             'incoming' => 'รอเริ่มประมูล',
             'active' => 'กำลังประมูลอยู่',
             'ending' => 'ใกล้หมดเวลา',

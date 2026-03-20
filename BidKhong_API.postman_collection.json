@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "BidKhong Auction API",
-    "description": "Complete API collection for BidKhong online auction platform. Import this into Postman to test all endpoints.",
+    "description": "Complete API collection for BidKhong online auction platform.\nUpdated: 24 Feb 2026 — includes Reviews, Certificates, Reports, Admin Panel.\n\nTotal: 51 endpoints across 12 folders.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "BidKhong"
   },
@@ -27,6 +27,11 @@
       "type": "string"
     },
     {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    },
+    {
       "key": "product_id",
       "value": "",
       "type": "string"
@@ -40,11 +45,31 @@
       "key": "order_id",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "report_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "certificate_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "notification_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "seller_id",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
     {
-      "name": "Authentication",
+      "name": "🔐 Authentication",
       "item": [
         {
           "name": "Register",
@@ -65,6 +90,9 @@
             }
           ],
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
             "header": [
               {
@@ -89,7 +117,7 @@
                 "register"
               ]
             },
-            "description": "Register a new user. Auto-creates wallet with 0 balance."
+            "description": "Register a new user. Auto-creates wallet with 0 balance.\n\nRequired: name, email, password (min 8), phone_number\nRate Limit: 10 req/min"
           },
           "response": []
         },
@@ -112,6 +140,9 @@
             }
           ],
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
             "header": [
               {
@@ -136,23 +167,63 @@
                 "login"
               ]
             },
-            "description": "Login with email and password. Returns user object and bearer token."
+            "description": "Login with email and password. Returns user object and bearer token.\nRate Limit: 10 req/min"
+          },
+          "response": []
+        },
+        {
+          "name": "Login as Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('admin_token', jsonData.token);",
+                  "    pm.collectionVariables.set('auth_token', jsonData.token);",
+                  "    pm.environment.set('admin_token', jsonData.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@bidkhong.com\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "Login as admin. Saves token to admin_token variable for Admin Panel tests."
           },
           "response": []
         },
         {
           "name": "Get Current User (Me)",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "GET",
             "header": [
               {
@@ -176,16 +247,6 @@
         {
           "name": "Update Profile",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "PATCH",
             "header": [
               {
@@ -215,92 +276,8 @@
           "response": []
         },
         {
-          "name": "Change Password",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"current_password\": \"password123\",\n  \"new_password\": \"newpassword123\",\n  \"new_password_confirmation\": \"newpassword123\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/change-password",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "change-password"
-              ]
-            },
-            "description": "Change password. Requires current password and new password (min 8 chars) with confirmation."
-          },
-          "response": []
-        },
-        {
-          "name": "Logout",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/logout",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "logout"
-              ]
-            },
-            "description": "Logout and invalidate current token."
-          },
-          "response": []
-        },
-        {
           "name": "Upload Profile Image",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "POST",
             "header": [
               {
@@ -334,6 +311,37 @@
           "response": []
         },
         {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"password123\",\n  \"new_password\": \"newpassword123\",\n  \"new_password_confirmation\": \"newpassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/change-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "change-password"
+              ]
+            },
+            "description": "Change password. Requires current password and new password (min 8 chars) with confirmation."
+          },
+          "response": []
+        },
+        {
           "name": "Forgot Password",
           "request": {
             "auth": {
@@ -363,7 +371,7 @@
                 "forgot-password"
               ]
             },
-            "description": "Request password reset token. Returns token in response (in production would be sent via email)."
+            "description": "Request password reset. Sends OTP 6 digits to email. Token valid for 60 minutes.\nRate Limit: 10 req/min"
           },
           "response": []
         },
@@ -386,7 +394,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"john@example.com\",\n  \"token\": \"PASTE_TOKEN_FROM_FORGOT_PASSWORD\",\n  \"password\": \"newpassword123\"\n}"
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"token\": \"PASTE_OTP_FROM_EMAIL\",\n  \"password\": \"newpassword123\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/reset-password",
@@ -397,19 +405,45 @@
                 "reset-password"
               ]
             },
-            "description": "Reset password using token from forgot-password. Token valid for 60 minutes. All sessions will be logged out."
+            "description": "Reset password using OTP from forgot-password email. All existing sessions will be logged out.\nRate Limit: 10 req/min"
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "logout"
+              ]
+            },
+            "description": "Logout and invalidate current token."
           },
           "response": []
         }
       ],
-      "description": "User authentication endpoints"
+      "description": "User authentication & profile management (10 endpoints)\nRate Limit: Auth routes = 10 req/min, Protected = 100 req/min"
     },
     {
-      "name": "Categories",
+      "name": "📂 Categories",
       "item": [
         {
           "name": "Get All Categories",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [
               {
@@ -426,13 +460,16 @@
                 "categories"
               ]
             },
-            "description": "Get all categories with their subcategories."
+            "description": "Get all 6 categories with their subcategories (36 total).\n\nCategories: Electronics, Fashion, Collectibles, Home & Living, Vehicles, Others"
           },
           "response": []
         },
         {
           "name": "Get Single Category",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [
               {
@@ -457,6 +494,9 @@
         {
           "name": "Get All Subcategories",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [
               {
@@ -478,14 +518,17 @@
           "response": []
         }
       ],
-      "description": "Category management endpoints"
+      "description": "Category & subcategory listing (3 endpoints, public)"
     },
     {
-      "name": "Products",
+      "name": "📦 Products",
       "item": [
         {
           "name": "Get All Products",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [
               {
@@ -502,13 +545,16 @@
                 "products"
               ]
             },
-            "description": "Get all active products. Supports query params: ?search=iphone&category_id=1&subcategory_id=2&min_price=1000&max_price=50000&location=Bangkok&status=active&sort=price_asc (sort options: price_asc, price_desc, newest, ending_soon)"
+            "description": "Get all products with pagination.\n\nQuery params: ?search=iphone&category_id=1&subcategory_id=2&min_price=1000&max_price=50000&location=Bangkok&status=active&sort=price_asc\n\nSort options: price_asc, price_desc, newest, ending_soon, most_bids, incoming"
           },
           "response": []
         },
         {
-          "name": "Search Products",
+          "name": "Search & Filter Products",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [
               {
@@ -535,6 +581,11 @@
                 },
                 {
                   "key": "category_id",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "subcategory_id",
                   "value": "1",
                   "disabled": true
                 },
@@ -581,6 +632,9 @@
             }
           ],
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [
               {
@@ -598,12 +652,12 @@
                 "{{product_id}}"
               ]
             },
-            "description": "Get single product with details, bid_increment, and minimum_bid."
+            "description": "Get single product with: seller info, bid info (count, highest bidder), images, certificate status, tag (hot/ending/ended/incoming/default), bid_increment, minimum_bid."
           },
           "response": []
         },
         {
-          "name": "Create Product",
+          "name": "Create Product (with Certificate)",
           "event": [
             {
               "listen": "test",
@@ -619,16 +673,6 @@
             }
           ],
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "POST",
             "header": [
               {
@@ -642,59 +686,88 @@
                 {
                   "key": "name",
                   "value": "iPhone 15 Pro",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Product name (required)"
                 },
                 {
                   "key": "description",
                   "value": "Brand new, sealed in box",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Product description (optional)"
                 },
                 {
                   "key": "starting_price",
                   "value": "30000",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Starting auction price (required)"
                 },
                 {
-                  "key": "min_price",
-                  "value": "32000",
-                  "type": "text"
+                  "key": "bid_increment",
+                  "value": "500",
+                  "type": "text",
+                  "description": "Minimum bid increment (required, min 1)"
                 },
                 {
                   "key": "buyout_price",
                   "value": "45000",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Buy Now price (optional)"
+                },
+                {
+                  "key": "duration",
+                  "value": "3",
+                  "type": "text",
+                  "description": "Auction duration in days: 1-5 (use this OR auction_end_time)"
                 },
                 {
                   "key": "auction_end_time",
-                  "value": "2026-02-20 18:00:00",
-                  "type": "text"
+                  "value": "2026-03-01 18:00:00",
+                  "type": "text",
+                  "disabled": true,
+                  "description": "Exact end time (use this OR duration)"
+                },
+                {
+                  "key": "auction_start_time",
+                  "value": "2026-02-25 10:00:00",
+                  "type": "text",
+                  "disabled": true,
+                  "description": "Start time (optional, defaults to now)"
                 },
                 {
                   "key": "category_id",
                   "value": "1",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Category ID (optional)"
                 },
                 {
                   "key": "subcategory_id",
                   "value": "1",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Subcategory ID (optional)"
                 },
                 {
                   "key": "location",
                   "value": "Bangkok",
-                  "type": "text"
+                  "type": "text",
+                  "description": "Location (optional)"
                 },
                 {
                   "key": "picture",
                   "type": "file",
                   "src": "",
-                  "description": "Product image (max 5MB, jpeg/png/jpg/gif/webp, optional)"
+                  "description": "Main product image (REQUIRED, max 5MB, jpeg/png/jpg/gif/webp)"
                 },
                 {
                   "key": "images[]",
                   "type": "file",
                   "src": "",
-                  "description": "Additional product images (max 5 files, each max 5MB, optional)"
+                  "description": "Additional images (optional, max 8 files, each max 5MB)"
+                },
+                {
+                  "key": "certificate",
+                  "type": "file",
+                  "src": "",
+                  "description": "Certificate file for authenticity (optional, PDF/jpeg/png/jpg, max 10MB). Admin will review."
                 }
               ]
             },
@@ -707,23 +780,38 @@
                 "products"
               ]
             },
-            "description": "Create a new auction product. Requires authentication. Uses FormData for file upload."
+            "description": "Create a new auction product with optional certificate.\n\nFormData upload. Required: name, starting_price, bid_increment, picture.\nOptional: description, buyout_price, duration OR auction_end_time, auction_start_time, category_id, subcategory_id, location, images[], certificate.\n\nIf certificate is uploaded, it will be in 'pending' status until admin approves."
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Products",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/me/products",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "products"
+              ]
+            },
+            "description": "Get all products listed by the current user (as seller)."
           },
           "response": []
         },
         {
           "name": "Delete Product",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "DELETE",
             "header": [
               {
@@ -741,23 +829,13 @@
                 "{{product_id}}"
               ]
             },
-            "description": "Delete a product. Only product owner can delete."
+            "description": "Delete a product. Only product owner can delete. Cannot delete if has active bids."
           },
           "response": []
         },
         {
           "name": "Delete Product Image",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "DELETE",
             "header": [
               {
@@ -782,24 +860,14 @@
           "response": []
         }
       ],
-      "description": "Product management endpoints"
+      "description": "Product management (7 endpoints)\nPublic: list & detail | Protected: create, delete, my products"
     },
     {
-      "name": "Bidding",
+      "name": "🔨 Bidding",
       "item": [
         {
           "name": "Place Bid",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "POST",
             "header": [
               {
@@ -826,23 +894,13 @@
                 "bid"
               ]
             },
-            "description": "Place a bid on a product. Validates: auction active, price > current_price, min bid increment (calculated from buyout_price), sufficient balance. Holds bid amount in escrow."
+            "description": "Place a bid on a product.\n\nRules:\n- price >= current_price + bid_increment\n- Cannot bid on own product\n- Must have sufficient wallet balance\n- Bid amount held in escrow (balance_available → balance_pending)\n- Previous highest bidder auto-refunded"
           },
           "response": []
         },
         {
           "name": "Buy Now",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "POST",
             "header": [
               {
@@ -868,16 +926,6 @@
         {
           "name": "Get Product Bid History",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "GET",
             "header": [
               {
@@ -903,16 +951,6 @@
         {
           "name": "Get My Bid History",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "GET",
             "header": [
               {
@@ -929,31 +967,29 @@
                 "users",
                 "me",
                 "bids"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "winning",
+                  "disabled": true,
+                  "description": "Filter: winning, outbid, won, lost"
+                }
               ]
             },
-            "description": "Get all bids placed by current user with summary (total, winning, outbid, won, lost). Filter with ?status=winning|outbid|won|lost"
+            "description": "Get all bids placed by current user with summary (total, winning, outbid, won, lost).\nFilter: ?status=winning|outbid|won|lost"
           },
           "response": []
         }
       ],
-      "description": "Bidding system endpoints"
+      "description": "Bidding system (4 endpoints, all protected)"
     },
     {
-      "name": "Wallet",
+      "name": "💰 Wallet",
       "item": [
         {
           "name": "Top Up Wallet",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "POST",
             "header": [
               {
@@ -967,7 +1003,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"amount\": 100000\n}"
+              "raw": "{\n  \"amount\": 10000\n}"
             },
             "url": {
               "raw": "{{base_url}}/wallet/topup",
@@ -979,23 +1015,13 @@
                 "topup"
               ]
             },
-            "description": "Add funds to user wallet. Amount must be > 0."
+            "description": "Add funds to wallet. Amount must be > 0.\n\nUpdates: balance_available += amount, balance_total += amount, deposit += amount\nCreates wallet_transaction type: 'topup'"
           },
           "response": []
         },
         {
-          "name": "Withdraw",
+          "name": "Withdraw from Wallet",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "POST",
             "header": [
               {
@@ -1021,23 +1047,13 @@
                 "withdraw"
               ]
             },
-            "description": "Withdraw funds from wallet. Min 100 Baht. Requires bank_code, account_number (10-15 chars), account_name."
+            "description": "Withdraw funds from wallet.\n\nMin: 100 Baht\nRequired: amount, bank_code, account_number (10-15 chars), account_name\nChecks: balance_available >= amount"
           },
           "response": []
         },
         {
-          "name": "Get Transactions",
+          "name": "Get Wallet Transactions",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "GET",
             "header": [
               {
@@ -1055,29 +1071,19 @@
                 "transactions"
               ]
             },
-            "description": "Get last 20 wallet transactions. Types: topup, withdraw, bid_placed, bid_refund, escrow_hold, escrow_release, auction_won, auction_sold."
+            "description": "Get wallet transaction history.\n\nTypes: topup, withdraw, bid_placed, bid_refund, auction_won, auction_sold, escrow_hold, escrow_release, escrow_refund"
           },
           "response": []
         }
       ],
-      "description": "Wallet management endpoints"
+      "description": "Wallet management: top up, withdraw, transaction history (3 endpoints)"
     },
     {
-      "name": "Orders",
+      "name": "🛒 Orders",
       "item": [
         {
           "name": "Get My Orders",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "GET",
             "header": [
               {
@@ -1103,16 +1109,6 @@
         {
           "name": "Close Auction (Manual)",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "POST",
             "header": [
               {
@@ -1131,64 +1127,33 @@
                 "close"
               ]
             },
-            "description": "Manually close auction and create order for winner. Only product owner can close. Creates order with status pending_buyer_confirm."
-          },
-          "response": []
-        },
-        {
-          "name": "Verify Order",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/orders/{{order_id}}/verify",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "orders",
-                "{{order_id}}",
-                "verify"
-              ]
-            },
-            "description": "Mark order as verified. Only order owner can verify."
+            "description": "Manually close auction and create order for winner.\nOnly product owner can close. Creates order with status pending_buyer_confirm.\n\nAlso triggers: notifications to winner/losers/seller, bid status updates."
           },
           "response": []
         }
       ],
-      "description": "Order management endpoints"
+      "description": "Order management (2 endpoints)"
     },
     {
-      "name": "Post-Auction",
+      "name": "🤝 Post-Auction (Escrow)",
       "item": [
         {
           "name": "Get Order Detail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('order_id', jsonData.order.id || jsonData.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "GET",
             "header": [
               {
@@ -1207,23 +1172,13 @@
                 "detail"
               ]
             },
-            "description": "Get order detail with buyer and seller contact info (name, phone_number). Contact is visible immediately after auction ends. Returns my_role (buyer/seller)."
+            "description": "Get order detail with buyer and seller contact info.\nReturns: order info, product, buyer/seller name & phone, my_role (buyer/seller), status timeline."
           },
           "response": []
         },
         {
           "name": "Confirm Order (Buyer)",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "POST",
             "header": [
               {
@@ -1242,23 +1197,13 @@
                 "confirm"
               ]
             },
-            "description": "Buyer confirms order. Holds escrow from buyer wallet. Sets ship_deadline to 3 days. Only buyer can confirm. Must be in pending_buyer_confirm status."
+            "description": "Buyer confirms order.\n\nEffects:\n- Holds escrow from buyer wallet\n- Status: pending_buyer_confirm → confirmed\n- Sets ship_deadline to 3 days\n- Notifies seller\n\nDeadline: 48 hours to confirm, or order auto-cancelled + strike"
           },
           "response": []
         },
         {
           "name": "Ship Order (Seller)",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "POST",
             "header": [
               {
@@ -1277,23 +1222,13 @@
                 "ship"
               ]
             },
-            "description": "Seller marks order as shipped. Sets receive_deadline to 7 days. Only seller can ship. Must be in confirmed status."
+            "description": "Seller marks order as shipped.\n\nEffects:\n- Status: confirmed → shipped\n- Sets receive_deadline to 7 days\n- Notifies buyer\n\nDeadline: 3 days to ship, or auto-cancelled + refund + strike"
           },
           "response": []
         },
         {
           "name": "Receive Order (Buyer)",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "POST",
             "header": [
               {
@@ -1312,23 +1247,13 @@
                 "receive"
               ]
             },
-            "description": "Buyer confirms item received. Releases escrow payment to seller. Marks order as completed. Only buyer can confirm receipt. Must be in shipped status."
+            "description": "Buyer confirms item received.\n\nEffects:\n- Status: shipped → completed\n- Releases escrow payment to seller wallet\n- Notifies seller\n\nDeadline: 7 days, then auto-complete"
           },
           "response": []
         },
         {
           "name": "Dispute Order (Buyer)",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "POST",
             "header": [
               {
@@ -1341,7 +1266,7 @@
               "formdata": [
                 {
                   "key": "reason",
-                  "value": "Item not as described",
+                  "value": "Item not as described, received a different product",
                   "type": "text",
                   "description": "Reason for dispute (required, max 1000 chars)"
                 },
@@ -1364,29 +1289,19 @@
                 "dispute"
               ]
             },
-            "description": "Buyer files a dispute. Only buyer can dispute. Must be in shipped status. Requires reason, optional evidence images. Admin will review."
+            "description": "Buyer files a dispute.\n\nOnly buyer can dispute. Must be in shipped status.\nRequired: reason. Optional: evidence_images (max 5).\nAdmin will review and resolve."
           },
           "response": []
         }
       ],
-      "description": "Post-auction flow: confirm → ship → receive/dispute. Contact info visible immediately after auction ends."
+      "description": "Post-auction escrow flow: confirm → ship → receive/dispute (5 endpoints)\n\nStatus: pending_buyer_confirm → confirmed → shipped → completed/disputed"
     },
     {
-      "name": "Notifications",
+      "name": "🔔 Notifications",
       "item": [
         {
           "name": "Get All Notifications",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "GET",
             "header": [
               {
@@ -1410,16 +1325,6 @@
         {
           "name": "Get Unread Notifications",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "GET",
             "header": [
               {
@@ -1444,16 +1349,6 @@
         {
           "name": "Mark Notification as Read",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "PATCH",
             "header": [
               {
@@ -1462,13 +1357,13 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/notifications/1/read",
+              "raw": "{{base_url}}/notifications/{{notification_id}}/read",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "notifications",
-                "1",
+                "{{notification_id}}",
                 "read"
               ]
             },
@@ -1479,16 +1374,6 @@
         {
           "name": "Mark All as Read",
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{auth_token}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "PATCH",
             "header": [
               {
@@ -1511,7 +1396,569 @@
           "response": []
         }
       ],
-      "description": "Notification system endpoints"
+      "description": "Notification system (4 endpoints)\nTypes: outbid, won, lost, sold, new_bid, order, system"
+    },
+    {
+      "name": "🚨 Reports",
+      "item": [
+        {
+          "name": "Submit Report",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('report_id', jsonData.report.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "reported_user_id",
+                  "value": "2",
+                  "type": "text",
+                  "description": "User ID to report (required)"
+                },
+                {
+                  "key": "reported_product_id",
+                  "value": "1",
+                  "type": "text",
+                  "description": "Product ID to report (optional)"
+                },
+                {
+                  "key": "type",
+                  "value": "fake_product",
+                  "type": "text",
+                  "description": "Type: scam, fake_product, harassment, inappropriate_content, other"
+                },
+                {
+                  "key": "description",
+                  "value": "This product appears to be counterfeit based on the images",
+                  "type": "text",
+                  "description": "Description (required, max 1000)"
+                },
+                {
+                  "key": "evidence_images[]",
+                  "type": "file",
+                  "src": "",
+                  "description": "Evidence images (optional, max 5 files, each max 5MB)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/reports",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reports"
+              ]
+            },
+            "description": "Submit a report against a user/product.\n\nTypes: scam, fake_product, harassment, inappropriate_content, other\nCannot report yourself.\nAdmin will review."
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Reports",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/reports",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reports"
+              ]
+            },
+            "description": "Get all reports submitted by current user with summary counts (pending, reviewing, resolved)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Report Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/reports/{{report_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reports",
+                "{{report_id}}"
+              ]
+            },
+            "description": "Get detail of a specific report (own reports only). Includes admin reply if any."
+          },
+          "response": []
+        }
+      ],
+      "description": "Report system — report users/products for violations (3 endpoints, protected)"
+    },
+    {
+      "name": "⭐ Reviews",
+      "item": [
+        {
+          "name": "Submit Review (after order completed)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"comment\": \"สินค้าดีมาก ส่งเร็ว ของแท้ แนะนำเลยครับ\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}/review",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                "{{order_id}}",
+                "review"
+              ]
+            },
+            "description": "Buyer reviews seller after order completed.\n\nRules:\n- Only buyer can review\n- Order must be 'completed'\n- 1 review per order (UNIQUE)\n- rating: 1-5 (required)\n- comment: optional (max 1000 chars)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Seller Reviews (Public)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/{{seller_id}}/reviews",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "{{seller_id}}",
+                "reviews"
+              ]
+            },
+            "description": "Get all reviews for a seller (public, no auth required).\n\nReturns:\n- summary: average_rating, total_reviews, rating_breakdown (5/4/3/2/1)\n- reviews: paginated list with reviewer info"
+          },
+          "response": []
+        }
+      ],
+      "description": "Review system — buyer rates seller after completed order (2 endpoints)\nPublic: view seller reviews | Protected: submit review"
+    },
+    {
+      "name": "🛡 Admin Panel",
+      "item": [
+        {
+          "name": "Dashboard (Stats)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/dashboard",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "dashboard"
+              ]
+            },
+            "description": "Get admin dashboard statistics: total users, products, orders, revenue, pending reports/disputes/certificates."
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Reports",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/reports",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "reports"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending",
+                  "disabled": true,
+                  "description": "Filter: pending, reviewing, resolved, dismissed"
+                }
+              ]
+            },
+            "description": "Get all user reports for admin review. Filter by ?status=pending|reviewing|resolved|dismissed"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Report Status",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"resolved\",\n  \"admin_note\": \"Reviewed and action taken against the reported user.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/reports/{{report_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "reports",
+                "{{report_id}}"
+              ]
+            },
+            "description": "Update report status and add admin note.\nStatus: pending → reviewing → resolved/dismissed"
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Users",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "users"
+              ]
+            },
+            "description": "Get all users with wallet info and strike counts."
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Detail",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/users/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "{{user_id}}"
+              ]
+            },
+            "description": "Get detailed user info: profile, wallet, products, orders, strikes, reports."
+          },
+          "response": []
+        },
+        {
+          "name": "Ban User",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Repeated scam reports\",\n  \"duration_days\": 30\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/users/{{user_id}}/ban",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                "{{user_id}}",
+                "ban"
+              ]
+            },
+            "description": "Ban a user for specified number of days. Creates a user_strike record.\nRequired: reason, duration_days"
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Certificates",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.length > 0) {",
+                  "        pm.collectionVariables.set('certificate_id', jsonData.data[0].id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/certificates",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "certificates"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending",
+                  "disabled": true,
+                  "description": "Filter: pending, approved, rejected"
+                }
+              ]
+            },
+            "description": "Get all product certificates for admin review.\nFilter: ?status=pending|approved|rejected\n\nIncludes: product info, seller info, file path."
+          },
+          "response": []
+        },
+        {
+          "name": "View/Download Certificate File",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/certificates/{{certificate_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "certificates",
+                "{{certificate_id}}"
+              ]
+            },
+            "description": "View or download the certificate file (PDF/image) for review."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Certificate (Approve/Reject)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\",\n  \"admin_note\": \"Certificate verified, product is authentic.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/certificates/{{certificate_id}}/verify",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "certificates",
+                "{{certificate_id}}",
+                "verify"
+              ]
+            },
+            "description": "Approve or reject a product certificate.\n\nRequired: status (approved/rejected)\nOptional: admin_note\n\nApproved → product gets 'Certified ✅' badge (is_certified accessor)\nSeller receives notification either way."
+          },
+          "response": []
+        }
+      ],
+      "description": "Admin panel — requires admin role (9 endpoints)\n\nLogin as admin first, then use admin_token.\nDefault admin: admin@bidkhong.com / admin123"
     }
   ]
 }

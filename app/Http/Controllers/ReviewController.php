@@ -4,11 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\Review;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class ReviewController extends Controller
 {
-    // POST /api/orders/{id}/review — ผู้ซื้อให้รีวิวผู้ขาย
+    // POST /api/orders/{id}/review — ผู้ซื้อให้คะแนนผู้ขาย (1-5 ดาว)
     public function store(Request $request, $id)
     {
         $order = Order::with('product')->findOrFail($id);
@@ -39,7 +40,6 @@ class ReviewController extends Controller
 
         $validated = $request->validate([
             'rating' => ['required', 'integer', 'min:1', 'max:5'],
-            'comment' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $review = Review::create([
@@ -47,10 +47,19 @@ class ReviewController extends Controller
             'reviewer_id' => $userId,
             'seller_id' => $order->seller_id,
             'rating' => $validated['rating'],
-            'comment' => $validated['comment'] ?? null,
         ]);
 
-        // โหลด reviewer info
+        // อัปเดต rating + total_reviews ของ seller ใน users table
+        $seller = User::find($order->seller_id);
+        if ($seller) {
+            $avgRating = Review::where('seller_id', $seller->id)->avg('rating');
+            $totalReviews = Review::where('seller_id', $seller->id)->count();
+            $seller->update([
+                'rating' => round($avgRating, 2),
+                'total_reviews' => $totalReviews,
+            ]);
+        }
+
         $review->load('reviewer:id,name');
 
         return response()->json([
@@ -62,15 +71,20 @@ class ReviewController extends Controller
     // GET /api/users/{id}/reviews — ดูรีวิวผู้ขาย (public)
     public function getSellerReviews($userId)
     {
+        $seller = User::find($userId);
+        if (!$seller) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
         $reviews = Review::where('seller_id', $userId)
             ->with('reviewer:id,name,profile_image')
             ->orderByDesc('created_at')
             ->paginate(20);
 
-        // สรุปคะแนน
+        // สรุปคะแนนจาก users table (ไม่ต้อง compute ใหม่)
         $summary = [
-            'average_rating' => round(Review::where('seller_id', $userId)->avg('rating'), 1) ?: null,
-            'total_reviews' => Review::where('seller_id', $userId)->count(),
+            'average_rating' => (float) $seller->rating,
+            'total_reviews' => $seller->total_reviews,
             'rating_breakdown' => [
                 5 => Review::where('seller_id', $userId)->where('rating', 5)->count(),
                 4 => Review::where('seller_id', $userId)->where('rating', 4)->count(),

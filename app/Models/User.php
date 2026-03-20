@@ -18,6 +18,8 @@ class User extends Authenticatable
         'phone_number',
         'role',
         'profile_image',
+        'rating',
+        'total_reviews',
     ];
 
     protected $hidden = [
@@ -30,6 +32,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'rating' => 'decimal:2',
         ];
     }
 
@@ -73,16 +76,5 @@ class User extends Authenticatable
         return $this->hasMany(Review::class , 'seller_id');
     }
 
-    // คะแนนเฉลี่ยจาก buyer
-    public function getAverageRatingAttribute(): ?float
-    {
-        $avg = $this->receivedReviews()->avg('rating');
-        return $avg ? round($avg, 1) : null;
-    }
-
-    // จำนวนรีวิวทั้งหมด
-    public function getTotalReviewsAttribute(): int
-    {
-        return $this->receivedReviews()->count();
-    }
+    // rating + total_reviews เก็บใน DB ตรงๆ แล้ว (อัปเดตเมื่อมีรีวิวใหม่)
 }

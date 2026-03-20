@@ -11,6 +11,7 @@ use App\Http\Controllers\PostAuctionController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\RecommendationController;
 use App\Http\Controllers\ReviewController;
 
 // Auth Routes (ไม่ต้อง login) - Rate limited to 10 requests per minute
@@ -35,6 +36,9 @@ Route::middleware('throttle:60,1')->group(function () {
 
     // Seller Reviews (public)
     Route::get('/users/{id}/reviews', [ReviewController::class , 'getSellerReviews']);
+
+    // Recommendations (similar items - public)
+    Route::get('/products/{id}/similar', [RecommendationController::class , 'similar']);
 });
 
 // Protected Routes (ต้อง login) - Rate limited to 100 requests per minute
@@ -86,12 +90,20 @@ Route::middleware(['auth:sanctum', 'throttle:100,1'])->group(function () {
 
     // Reviews
     Route::post('/orders/{id}/review', [ReviewController::class , 'store']);
+
+    // Recommendations (personalized - ต้อง login)
+    Route::get('/recommendations', [RecommendationController::class , 'forUser']);
 });
 
 // Admin Routes (ต้อง login + เป็น admin) - Rate limited to 100 requests per minute
 Route::middleware(['auth:sanctum', 'admin', 'throttle:100,1'])->prefix('admin')->group(function () {
     // Dashboard
     Route::get('/dashboard', [AdminController::class , 'dashboard']);
+
+    // Product Approval (อนุมัติ/ปฏิเสธสินค้า)
+    Route::get('/products', [AdminController::class , 'pendingProducts']);
+    Route::patch('/products/{id}/approve', [AdminController::class , 'approveProduct']);
+    Route::patch('/products/{id}/reject', [AdminController::class , 'rejectProduct']);
 
     // Reports + Disputes (รวมเป็นระบบเดียว)
     Route::get('/reports', [AdminController::class , 'reports']);
@@ -101,6 +113,7 @@ Route::middleware(['auth:sanctum', 'admin', 'throttle:100,1'])->prefix('admin')-
     Route::get('/users', [AdminController::class , 'users']);
     Route::get('/users/{id}', [AdminController::class , 'userDetail']);
     Route::post('/users/{id}/ban', [AdminController::class , 'banUser']);
+    Route::post('/users/{id}/unban', [AdminController::class , 'unbanUser']);
 
     // Certificates
     Route::get('/certificates', [AdminController::class , 'certificates']);

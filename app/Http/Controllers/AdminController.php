@@ -26,6 +26,7 @@ class AdminController extends Controller
             'active_auctions' => Product::where('status', 'active')->count(),
             'open_disputes' => Report::where('type', 'dispute')->where('status', 'open')->count(),
             'pending_reports' => Report::where('type', '!=', 'dispute')->where('status', 'pending')->count(),
+            'pending_products' => Product::where('status', 'pending')->count(),
             'pending_certificates' => ProductCertificate::where('status', 'pending')->count(),
             'recent_orders' => Order::with(['product:id,name', 'user:id,name', 'seller:id,name'])
                 ->orderBy('created_at', 'desc')
@@ -292,6 +293,40 @@ class AdminController extends Controller
         ]);
     }
 
+    // POST /api/admin/users/{id}/unban - ปลดแบน user
+    public function unbanUser(Request $request, $id)
+    {
+        $user = User::findOrFail($id);
+
+        // หา strike ที่ยังไม่หมดอายุ
+        $activeStrikes = UserStrike::where('user_id', $user->id)
+            ->where('banned_until', '>', now())
+            ->get();
+
+        if ($activeStrikes->isEmpty()) {
+            return response()->json([
+                'message' => 'This user is not currently banned.',
+            ], 422);
+        }
+
+        // set banned_until = now() (ปลดแบนทันที)
+        UserStrike::where('user_id', $user->id)
+            ->where('banned_until', '>', now())
+            ->update(['banned_until' => now()]);
+
+        // แจ้งเตือน user
+        Notification::create([
+            'user_id' => $user->id,
+            'type' => 'system',
+            'title' => 'Account unbanned',
+            'message' => 'บัญชีของคุณถูกปลดแบนแล้ว สามารถใช้งานได้ตามปกติ',
+        ]);
+
+        return response()->json([
+            'message' => "User {$user->name} has been unbanned.",
+        ]);
+    }
+
     // === Helper: คืนเงิน escrow ให้ buyer ===
     private function refundEscrow(Order $order): void
     {
@@ -425,6 +460,97 @@ class AdminController extends Controller
         return response()->json([
             'message' => 'Certificate ' . $validated['status'] . ' successfully.',
             'certificate' => $cert->fresh(['product:id,name', 'verifier:id,name']),
+        ]);
+    }
+
+    // === Product Approval ===
+
+    // GET /api/admin/products - ดูสินค้าทั้งหมด (กรองตาม status ได้)
+    public function pendingProducts(Request $request)
+    {
+        $query = Product::with([
+            'user:id,name,email',
+            'category:id,name',
+            'subcategory:id,name',
+            'images',
+            'certificate',
+        ])->withCount('bids');
+
+        // กรองตาม status (?status=pending) — default: pending
+        $status = $request->input('status', 'pending');
+        $query->where('status', $status);
+
+        $products = $query->orderBy('created_at', 'desc')->paginate(20);
+
+        return response()->json($products);
+    }
+
+    // PATCH /api/admin/products/{id}/approve - อนุมัติสินค้า
+    public function approveProduct(Request $request, $id)
+    {
+        $product = Product::findOrFail($id);
+
+        if ($product->status !== 'pending') {
+            return response()->json([
+                'message' => 'Only pending products can be approved. Current status: ' . $product->status,
+            ], 422);
+        }
+
+        $product->update([
+            'status' => 'active',
+            'approved_by' => $request->user()->id,
+            'approved_at' => now(),
+        ]);
+
+        // แจ้งเตือนผู้ขาย
+        Notification::create([
+            'user_id' => $product->user_id,
+            'type' => 'system',
+            'title' => 'สินค้าได้รับการอนุมัติ',
+            'message' => "สินค้า \"{$product->name}\" ของคุณได้รับการอนุมัติแล้ว พร้อมเปิดประมูล!",
+            'product_id' => $product->id,
+        ]);
+
+        return response()->json([
+            'message' => 'Product approved successfully.',
+            'product' => $product->fresh(['user:id,name', 'images']),
+        ]);
+    }
+
+    // PATCH /api/admin/products/{id}/reject - ปฏิเสธสินค้า
+    public function rejectProduct(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'admin_note' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $product = Product::findOrFail($id);
+
+        if ($product->status !== 'pending') {
+            return response()->json([
+                'message' => 'Only pending products can be rejected. Current status: ' . $product->status,
+            ], 422);
+        }
+
+        $product->update([
+            'status' => 'rejected',
+            'admin_note' => $validated['admin_note'],
+            'approved_by' => $request->user()->id,
+            'approved_at' => now(),
+        ]);
+
+        // แจ้งเตือนผู้ขาย
+        Notification::create([
+            'user_id' => $product->user_id,
+            'type' => 'system',
+            'title' => 'สินค้าถูกปฏิเสธ',
+            'message' => "สินค้า \"{$product->name}\" ของคุณถูกปฏิเสธ เหตุผล: {$validated['admin_note']}",
+            'product_id' => $product->id,
+        ]);
+
+        return response()->json([
+            'message' => 'Product rejected.',
+            'product' => $product->fresh(['user:id,name', 'images']),
         ]);
     }
 }

@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\WalletTransaction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -155,11 +156,12 @@ class AuthController extends Controller
         ]);
     }
 
-    // POST /api/wallet/topup - เติมเงิน
+    // POST /api/wallet/topup - เติมเงิน (ต้องแนบสลิป + verify ผ่าน Slip2Go API)
     public function topup(Request $request)
     {
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'min:1'],
+            'slip_image' => ['required', 'image', 'mimes:jpeg,png,jpg', 'max:5120'],
         ]);
 
         $user = $request->user();
@@ -169,7 +171,34 @@ class AuthController extends Controller
             return response()->json(['message' => 'Wallet not found'], 404);
         }
 
-        $result = DB::transaction(function () use ($wallet, $validated, $user) {
+        // อัปโหลดสลิป
+        $slipPath = $request->file('slip_image')->store('slips', 'public');
+
+        // เรียก Slip2Go API เพื่อ verify สลิป
+        $slipVerification = $this->verifySlipWithSlip2Go($request->file('slip_image'));
+
+        if (!$slipVerification['success']) {
+            // สลิป verify ไม่ผ่าน → บันทึก transaction แต่ไม่เพิ่มเงิน
+            WalletTransaction::create([
+                'user_id' => $user->id,
+                'wallet_id' => $wallet->id,
+                'type' => 'topup',
+                'amount' => $validated['amount'],
+                'description' => 'Top Up - Mobile Banking (Slip rejected)',
+                'balance_after' => $wallet->balance_available,
+                'slip_image' => $slipPath,
+                'slip_status' => 'rejected',
+                'slip_data' => $slipVerification['data'],
+            ]);
+
+            return response()->json([
+                'message' => 'Slip verification failed: ' . ($slipVerification['reason'] ?? 'Invalid slip'),
+                'slip_status' => 'rejected',
+            ], 400);
+        }
+
+        // สลิป verify สำเร็จ → เพิ่มเงิน
+        $result = DB::transaction(function () use ($wallet, $validated, $user, $slipPath, $slipVerification) {
             $wallet = $wallet->lockForUpdate()->find($wallet->id);
 
             $wallet->balance_available += $validated['amount'];
@@ -185,6 +214,10 @@ class AuthController extends Controller
                 'amount' => $validated['amount'],
                 'description' => 'Top Up - Mobile Banking',
                 'balance_after' => $wallet->balance_available,
+                'slip_image' => $slipPath,
+                'slip_status' => 'verified',
+                'slip_data' => $slipVerification['data'],
+                'verified_at' => now(),
             ]);
 
             return $wallet;
@@ -193,7 +226,54 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Topup successful',
             'balance_available' => $result->balance_available,
+            'slip_status' => 'verified',
         ]);
+    }
+
+    // เรียก Slip2Go API เพื่อตรวจสอบสลิป
+    private function verifySlipWithSlip2Go($slipFile): array
+    {
+        $apiKey = config('services.slip2go.api_key');
+        $baseUrl = config('services.slip2go.base_url');
+
+        if (!$apiKey) {
+            // ถ้ายังไม่ได้ตั้งค่า API key → ให้ผ่านเลย (dev mode)
+            return [
+                'success' => true,
+                'data' => ['message' => 'Slip2Go API key not configured - auto approved (dev mode)'],
+                'reason' => null,
+            ];
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'x-authorization' => $apiKey,
+            ])->attach(
+                'files', file_get_contents($slipFile->getRealPath()), $slipFile->getClientOriginalName()
+            )->post("{$baseUrl}/api/verify-slip/qr-image/info");
+
+            $data = $response->json();
+
+            if ($response->successful() && isset($data['data'])) {
+                return [
+                    'success' => true,
+                    'data' => $data['data'],
+                    'reason' => null,
+                ];
+            }
+
+            return [
+                'success' => false,
+                'data' => $data,
+                'reason' => $data['message'] ?? 'Slip verification failed',
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'data' => ['error' => $e->getMessage()],
+                'reason' => 'Slip verification service unavailable',
+            ];
+        }
     }
 
     // GET /api/wallet/transactions - Get wallet transactions

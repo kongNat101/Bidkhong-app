@@ -15,11 +15,17 @@ class WalletTransaction extends Model
         'reference_type',
         'reference_id',
         'balance_after',
+        'slip_image',
+        'slip_status',
+        'slip_data',
+        'verified_at',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'balance_after' => 'decimal:2',
+        'slip_data' => 'array',
+        'verified_at' => 'datetime',
     ];
 
     public function user()

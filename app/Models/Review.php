@@ -11,7 +11,6 @@ class Review extends Model
         'reviewer_id',
         'seller_id',
         'rating',
-        'comment',
     ];
 
     public function order()

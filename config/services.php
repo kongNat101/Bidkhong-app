@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    'slip2go' => [
+        'api_key' => env('SLIP2GO_API_KEY'),
+        'base_url' => env('SLIP2GO_BASE_URL', 'https://api.slip2go.com'),
+    ],
+
+    'recommendation' => [
+        'base_url' => env('RECOMMENDATION_SERVICE_URL', 'http://recommendation:5000'),
+    ],
+
 ];

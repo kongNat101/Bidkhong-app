@@ -138,11 +138,22 @@ class BidController extends Controller
             $product->update([
                 'current_price' => $validated['price']
             ]);
+
+            // Anti-sniping: ถ้า bid ในช่วง 5 นาทีสุดท้าย → รีเซ็ตเวลากลับไปเหลือ 5 นาที
+            $minutesLeft = now()->diffInMinutes($product->auction_end_time, false);
+            if ($minutesLeft >= 0 && $minutesLeft <= 5) {
+                $product->auction_end_time = now()->addMinutes(5);
+                $product->save();
+            }
         });
+
+        // โหลดเวลาใหม่ (อาจถูก anti-sniping ขยายเวลา)
+        $product->refresh();
 
         return response()->json([
             'message' => 'Bid placed successfully',
-            'current_price' => $validated['price']
+            'current_price' => $validated['price'],
+            'auction_end_time' => $product->auction_end_time,
         ], 201);
     }
 

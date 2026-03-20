@@ -24,11 +24,15 @@ class Product extends Model
         'location',
         'picture',
         'status',
+        'admin_note',
+        'approved_by',
+        'approved_at',
     ];
 
     protected $casts = [
         'auction_start_time' => 'datetime',
         'auction_end_time' => 'datetime',
+        'approved_at' => 'datetime',
         'starting_price' => 'decimal:2',
         'current_price' => 'decimal:2',
         'bid_increment' => 'decimal:2',
@@ -78,9 +82,19 @@ class Product extends Model
         return $this->certificate && $this->certificate->status === 'approved';
     }
 
-    // คำนวณ tag สถานะสินค้า (Priority: Hot > Ending > Ended > Incoming > Default)
+    // คำนวณ tag สถานะสินค้า (Priority: Pending > Rejected > Hot > Ending > Ended > Incoming > Default)
     public function getTagAttribute(): string
     {
+        // Pending: รออนุมัติจาก admin
+        if ($this->status === 'pending') {
+            return 'pending';
+        }
+
+        // Rejected: ถูก admin ปฏิเสธ
+        if ($this->status === 'rejected') {
+            return 'rejected';
+        }
+
         // Hot: มี bids >= 10 ครั้ง
         $bidCount = $this->bids_count ?? $this->bids()->count();
         if ($bidCount >= 10) {
@@ -106,5 +120,10 @@ class Product extends Model
         }
 
         return 'default';
+    }
+
+    public function approver()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
     }
 }
