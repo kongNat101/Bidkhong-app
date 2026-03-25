@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "BidKhong Auction API",
-    "description": "Complete API collection for BidKhong online auction platform.\nUpdated: 19 Mar 2026 — includes Recommendations, Admin Approval, Slip Verify, Anti-sniping, Reviews (rating only), Unban.\n\nTotal: 58 endpoints across 13 folders.",
+    "description": "Complete API collection for BidKhong online auction platform.\nUpdated: 25 Mar 2026 — includes Search History, Recommendations, Admin Approval, Slip Verify, Anti-sniping, Seller Rating, Unban.\n\nTotal: 61 endpoints across 14 folders.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "BidKhong"
   },
@@ -1529,6 +1529,82 @@
         }
       ],
       "description": "Report system — report users/products for violations (3 endpoints, protected)"
+    },
+    {
+      "name": "🔍 Search History",
+      "item": [
+        {
+          "name": "Get Search History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/search-history",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "search-history"
+              ]
+            },
+            "description": "🆕 ดูประวัติค้นหาล่าสุด 20 อัน (เรียงตาม updated_at desc)\n\nAuth: Required\nประวัติถูกบันทึกอัตโนมัติเมื่อ search สินค้า (?search=xxx)"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Search History (1 item)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/search-history/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "search-history",
+                "1"
+              ]
+            },
+            "description": "🆕 ลบประวัติค้นหา 1 รายการ\n\nAuth: Required\nเปลี่ยน /1 เป็น ID ที่ต้องการลบ"
+          },
+          "response": []
+        },
+        {
+          "name": "Clear All Search History",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/search-history",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "search-history"
+              ]
+            },
+            "description": "🆕 ลบประวัติค้นหาทั้งหมดของ user\n\nAuth: Required"
+          },
+          "response": []
+        }
+      ],
+      "description": "🆕 Search History — บันทึกอัตโนมัติเมื่อ search สินค้า (3 endpoints, protected)\nดูประวัติ / ลบ 1 อัน / ลบทั้งหมด"
     },
     {
       "name": "⭐ Reviews",
