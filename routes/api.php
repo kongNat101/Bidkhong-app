@@ -50,8 +50,8 @@ Route::middleware('throttle:60,1')->group(function () {
     });
 });
 
-// Protected Routes (ต้อง login) - Rate limited to 100 requests per minute
-Route::middleware(['auth:sanctum', 'throttle:100,1'])->group(function () {
+// Protected Routes (ต้อง login + เช็คแบน) - Rate limited to 100 requests per minute
+Route::middleware(['auth:sanctum', 'check-banned', 'throttle:100,1'])->group(function () {
     // Auth
     Route::post('/logout', [AuthController::class , 'logout']);
     Route::get('/me', [AuthController::class , 'me']);
@@ -99,6 +99,7 @@ Route::middleware(['auth:sanctum', 'throttle:100,1'])->group(function () {
 
     // Search History
     Route::get('/search-history', [SearchHistoryController::class , 'index']);
+    Route::post('/search-history', [SearchHistoryController::class , 'store']);
     Route::delete('/search-history', [SearchHistoryController::class , 'clearAll']);
     Route::delete('/search-history/{id}', [SearchHistoryController::class , 'destroy']);
 

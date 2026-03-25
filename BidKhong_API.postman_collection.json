@@ -1557,6 +1557,37 @@
           "response": []
         },
         {
+          "name": "Save Search Keyword",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"keyword\": \"iphone\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/search-history",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "search-history"
+              ]
+            },
+            "description": "🆕 บันทึกคำค้นหาเข้า DB\n\nAuth: Required\nBody: { keyword: string (required, max 255) }\n\nถ้าคำค้นซ้ำ → อัปเดต timestamp ให้ขึ้นบนสุด (ไม่สร้างซ้ำ)"
+          },
+          "response": []
+        },
+        {
           "name": "Delete Search History (1 item)",
           "request": {
             "method": "DELETE",

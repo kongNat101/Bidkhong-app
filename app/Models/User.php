@@ -27,6 +27,8 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    protected $appends = ['is_banned', 'active_banned_until', 'ban_reason'];
+
     protected function casts(): array
     {
         return [

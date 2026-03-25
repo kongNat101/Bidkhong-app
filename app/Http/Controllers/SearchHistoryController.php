@@ -18,6 +18,24 @@ class SearchHistoryController extends Controller
         return response()->json($histories);
     }
 
+    // POST /api/search-history — บันทึกคำค้น
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'keyword' => ['required', 'string', 'max:255'],
+        ]);
+
+        $history = SearchHistory::updateOrCreate(
+            ['user_id' => $request->user()->id, 'keyword' => $validated['keyword']],
+            ['updated_at' => now()]
+        );
+
+        return response()->json([
+            'message' => 'Search saved',
+            'search' => $history,
+        ], 201);
+    }
+
     // DELETE /api/search-history/{id} — ลบ 1 อัน
     public function destroy(Request $request, $id)
     {
