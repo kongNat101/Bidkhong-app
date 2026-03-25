@@ -240,6 +240,14 @@ class AdminController extends Controller
 
         $users = $query->orderBy('created_at', 'desc')->paginate(20);
 
+        // เพิ่ม ban status ให้ทุก user
+        $users->getCollection()->transform(function ($user) {
+            $user->is_banned = $user->is_banned;
+            $user->banned_until = $user->active_banned_until;
+            $user->ban_reason = $user->ban_reason;
+            return $user;
+        });
+
         return response()->json($users);
     }
 
@@ -252,6 +260,11 @@ class AdminController extends Controller
 
         // นับจำนวน report ที่ถูกรายงาน
         $user->reported_count = Report::where('reported_user_id', $id)->count();
+
+        // เพิ่ม ban status
+        $user->is_banned = $user->is_banned;
+        $user->banned_until = $user->active_banned_until;
+        $user->ban_reason = $user->ban_reason;
 
         return response()->json($user);
     }

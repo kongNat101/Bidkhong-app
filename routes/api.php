@@ -13,6 +13,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\RecommendationController;
 use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\SearchHistoryController;
 
 // Auth Routes (ไม่ต้อง login) - Rate limited to 10 requests per minute
 Route::middleware('throttle:10,1')->group(function () {
@@ -34,11 +35,19 @@ Route::middleware('throttle:60,1')->group(function () {
     Route::get('/categories/{id}', [CategoryController::class , 'show']);
     Route::get('/subcategories', [CategoryController::class , 'subcategories']);
 
-    // Seller Reviews (public)
-    Route::get('/users/{id}/reviews', [ReviewController::class , 'getSellerReviews']);
+    // Seller Ratings (public)
+    Route::get('/users/{id}/ratings', [ReviewController::class , 'getSellerRatings']);
 
     // Recommendations (similar items - public)
     Route::get('/products/{id}/similar', [RecommendationController::class , 'similar']);
+
+    // Public Stats (สำหรับ welcome page)
+    Route::get('/public/stats', function () {
+        return response()->json([
+            'total_users' => \App\Models\User::where('role', 'user')->count(),
+            'total_products' => \App\Models\Product::where('status', 'active')->count(),
+        ]);
+    });
 });
 
 // Protected Routes (ต้อง login) - Rate limited to 100 requests per minute
@@ -88,8 +97,13 @@ Route::middleware(['auth:sanctum', 'throttle:100,1'])->group(function () {
     Route::get('/reports', [ReportController::class , 'index']);
     Route::get('/reports/{id}', [ReportController::class , 'show']);
 
-    // Reviews
-    Route::post('/orders/{id}/review', [ReviewController::class , 'store']);
+    // Search History
+    Route::get('/search-history', [SearchHistoryController::class , 'index']);
+    Route::delete('/search-history', [SearchHistoryController::class , 'clearAll']);
+    Route::delete('/search-history/{id}', [SearchHistoryController::class , 'destroy']);
+
+    // Rate Seller
+    Route::post('/users/{id}/rate', [ReviewController::class , 'rate']);
 
     // Recommendations (personalized - ต้อง login)
     Route::get('/recommendations', [RecommendationController::class , 'forUser']);

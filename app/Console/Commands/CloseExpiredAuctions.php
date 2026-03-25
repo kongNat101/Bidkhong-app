@@ -46,46 +46,9 @@ class CloseExpiredAuctions extends Command
                 // อัพเดทสถานะ bid
                 $winningBid->update(['status' => 'won']);
 
-                // หักเงินจาก pending ไปจ่ายจริง (auction_won transaction)
-                $winnerWallet = $winningBid->user->wallet;
-                if ($winnerWallet) {
-                    // ย้ายจาก pending ไป total (เงินถูกใช้จริง)
-                    $winnerWallet->balance_pending -= $winningBid->price;
-                    $winnerWallet->balance_total -= $winningBid->price;
-                    $winnerWallet->save();
-
-                    // บันทึก transaction
-                    WalletTransaction::create([
-                        'user_id' => $winningBid->user_id,
-                        'wallet_id' => $winnerWallet->id,
-                        'type' => 'auction_won',
-                        'amount' => -$winningBid->price,
-                        'description' => "Won auction: {$product->name}",
-                        'reference_type' => 'product',
-                        'reference_id' => $product->id,
-                        'balance_after' => $winnerWallet->balance_available,
-                    ]);
-                }
-
-                // โอนเงินให้ผู้ขาย
-                $sellerWallet = $product->user->wallet;
-                if ($sellerWallet) {
-                    $sellerWallet->balance_available += $winningBid->price;
-                    $sellerWallet->balance_total += $winningBid->price;
-                    $sellerWallet->save();
-
-                    // บันทึก transaction ให้ผู้ขาย
-                    WalletTransaction::create([
-                        'user_id' => $product->user_id,
-                        'wallet_id' => $sellerWallet->id,
-                        'type' => 'auction_sold',
-                        'amount' => $winningBid->price,
-                        'description' => "Sold: {$product->name}",
-                        'reference_type' => 'product',
-                        'reference_id' => $product->id,
-                        'balance_after' => $sellerWallet->balance_available,
-                    ]);
-                }
+                // ไม่แตะ wallet — เงิน buyer ยังอยู่ใน balance_pending จากตอน bid
+                // เงินจะถูกจัดการใน PostAuctionController:
+                // confirm() → escrow hold, receive() → releaseEscrow() → โอนให้ seller
 
                 // ส่ง notification ให้ผู้ชนะ
                 \App\Models\Notification::create([

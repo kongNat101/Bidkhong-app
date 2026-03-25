@@ -109,6 +109,9 @@ class BidController extends Controller
                 ]);
             }
 
+            // โหลด wallet ใหม่จาก DB (กรณี bid สินค้าเดิมซ้ำ — refund ด้านบนอาจแก้ wallet เดียวกัน)
+            $wallet->refresh();
+
             // หักเงินจาก wallet
             $wallet->balance_available -= $validated['price'];
             $wallet->balance_pending += $validated['price'];

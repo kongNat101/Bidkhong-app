@@ -77,4 +77,34 @@ class User extends Authenticatable
     }
 
     // rating + total_reviews เก็บใน DB ตรงๆ แล้ว (อัปเดตเมื่อมีรีวิวใหม่)
+
+    // === Ban Status Accessors ===
+
+    // เช็คว่าถูกแบนอยู่หรือไม่
+    public function getIsBannedAttribute(): bool
+    {
+        return $this->strikes()
+            ->where('banned_until', '>', now())
+            ->exists();
+    }
+
+    // วันหมดแบน (strike ล่าสุดที่ยังมีผล)
+    public function getActiveBannedUntilAttribute(): ?string
+    {
+        $strike = $this->strikes()
+            ->where('banned_until', '>', now())
+            ->orderByDesc('banned_until')
+            ->first();
+        return $strike?->banned_until?->toISOString();
+    }
+
+    // เหตุผลที่ถูกแบน (strike ล่าสุดที่ยังมีผล)
+    public function getBanReasonAttribute(): ?string
+    {
+        $strike = $this->strikes()
+            ->where('banned_until', '>', now())
+            ->orderByDesc('banned_until')
+            ->first();
+        return $strike?->reason;
+    }
 }

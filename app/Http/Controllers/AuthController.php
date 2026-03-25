@@ -276,11 +276,12 @@ class AuthController extends Controller
         }
     }
 
-    // GET /api/wallet/transactions - Get wallet transactions
+    // GET /api/wallet/transactions - Get wallet transactions (topup + withdraw เท่านั้น)
     public function getTransactions(Request $request)
     {
         $user = $request->user();
         $transactions = WalletTransaction::where('user_id', $user->id)
+            ->whereIn('type', ['topup', 'withdraw'])
             ->orderBy('created_at', 'desc')
             ->limit(20)
             ->get();

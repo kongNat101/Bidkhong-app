@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Models\ProductCertificate;
+use App\Models\SearchHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -94,6 +95,15 @@ class ProductController extends Controller
         }
 
         $products = $query->paginate(20);
+
+        // บันทึกประวัติค้นหา (ถ้า login + มีคำค้น)
+        if ($request->search && $request->user()) {
+            SearchHistory::updateOrCreate(
+                ['user_id' => $request->user()->id, 'keyword' => $request->search],
+                ['updated_at' => now()]
+            );
+        }
+
         return response()->json($products);
     }
 
