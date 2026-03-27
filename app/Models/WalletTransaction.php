@@ -19,6 +19,9 @@ class WalletTransaction extends Model
         'slip_status',
         'slip_data',
         'verified_at',
+        'withdraw_status',
+        'confirmed_by',
+        'confirmed_at',
     ];
 
     protected $casts = [
@@ -26,6 +29,7 @@ class WalletTransaction extends Model
         'balance_after' => 'decimal:2',
         'slip_data' => 'array',
         'verified_at' => 'datetime',
+        'confirmed_at' => 'datetime',
     ];
 
     public function user()

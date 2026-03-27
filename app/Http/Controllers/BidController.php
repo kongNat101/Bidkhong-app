@@ -103,8 +103,8 @@ class BidController extends Controller
                 \App\Models\Notification::create([
                     'user_id' => $oldBid->user_id,
                     'type' => 'outbid',
-                    'title' => 'You have been outbid!',
-                    'message' => "Someone bid higher on {$product->name} at " . number_format($validated['price']) . " Baht. Your bid has been refunded.",
+                    'title' => 'มีผู้เสนอราคาสูงกว่าคุณ!',
+                    'message' => "มีคนเสนอราคา " . number_format($validated['price']) . " บาท สำหรับ {$product->name} สูงกว่าคุณ! เงินของคุณถูกคืนแล้ว กลับไปเสนอราคาใหม่เลย!",
                     'product_id' => $product->id,
                 ]);
             }

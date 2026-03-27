@@ -14,6 +14,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\RecommendationController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SearchHistoryController;
+use App\Http\Controllers\ProductWatchController;
 
 // Auth Routes (ไม่ต้อง login) - Rate limited to 10 requests per minute
 Route::middleware('throttle:10,1')->group(function () {
@@ -84,7 +85,6 @@ Route::middleware(['auth:sanctum', 'check-banned', 'throttle:100,1'])->group(fun
     Route::get('/orders/{id}/detail', [PostAuctionController::class , 'detail']);
     Route::post('/orders/{id}/ship', [PostAuctionController::class , 'ship']);
     Route::post('/orders/{id}/receive', [PostAuctionController::class , 'receive']);
-    Route::post('/orders/{id}/dispute', [PostAuctionController::class , 'dispute']);
 
     // Notifications
     Route::get('/notifications', [NotificationController::class , 'index']);
@@ -105,6 +105,10 @@ Route::middleware(['auth:sanctum', 'check-banned', 'throttle:100,1'])->group(fun
 
     // Rate Seller
     Route::post('/users/{id}/rate', [ReviewController::class , 'rate']);
+
+    // Product Watch (ติดตามสินค้า)
+    Route::post('/products/{id}/watch', [ProductWatchController::class , 'toggle']);
+    Route::get('/users/me/watchlist', [ProductWatchController::class , 'watchlist']);
 
     // Recommendations (personalized - ต้อง login)
     Route::get('/recommendations', [RecommendationController::class , 'forUser']);
@@ -129,6 +133,11 @@ Route::middleware(['auth:sanctum', 'admin', 'throttle:100,1'])->prefix('admin')-
     Route::get('/users/{id}', [AdminController::class , 'userDetail']);
     Route::post('/users/{id}/ban', [AdminController::class , 'banUser']);
     Route::post('/users/{id}/unban', [AdminController::class , 'unbanUser']);
+
+    // Withdrawals (จัดการการถอนเงิน)
+    Route::get('/withdrawals', [AdminController::class , 'withdrawals']);
+    Route::patch('/withdrawals/{id}/confirm', [AdminController::class , 'confirmWithdrawal']);
+    Route::patch('/withdrawals/{id}/reject', [AdminController::class , 'rejectWithdrawal']);
 
     // Certificates
     Route::get('/certificates', [AdminController::class , 'certificates']);

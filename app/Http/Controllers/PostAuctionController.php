@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
-use App\Models\Report;
 use App\Models\UserStrike;
 use App\Models\WalletTransaction;
 use App\Models\Notification;
@@ -129,7 +128,7 @@ class PostAuctionController extends Controller
     // GET /api/orders/{id}/detail — ดูรายละเอียด order + contact ทั้ง 2 ฝั่ง (เปิดเผยทันที)
     public function detail(Request $request, $id)
     {
-        $order = Order::with(['product', 'user:id,name,phone_number', 'seller:id,name,phone_number', 'dispute'])
+        $order = Order::with(['product', 'user:id,name,phone_number', 'seller:id,name,phone_number'])
             ->findOrFail($id);
         $userId = $request->user()->id;
 
@@ -232,82 +231,6 @@ class PostAuctionController extends Controller
 
         return response()->json([
             'message' => 'Order completed! Payment released to seller.',
-        ]);
-    }
-
-    // POST /api/orders/{id}/dispute — ผู้ชนะแจ้งปัญหา
-    public function dispute(Request $request, $id)
-    {
-        $order = Order::with('product')->findOrFail($id);
-        $userId = $request->user()->id;
-
-        // เช็คว่าเป็น buyer
-        if ($order->user_id !== $userId) {
-            return response()->json([
-                'message' => 'Only the buyer can file a dispute'
-            ], 403);
-        }
-
-        // เช็คว่า status = shipped
-        if ($order->status !== 'shipped') {
-            return response()->json([
-                'message' => 'Can only dispute orders that have been shipped',
-                'current_status' => $order->status
-            ], 400);
-        }
-
-        // เช็คว่ายังไม่มี dispute
-        $existing = Report::where('order_id', $id)->where('type', 'dispute')->first();
-        if ($existing) {
-            return response()->json([
-                'message' => 'A dispute has already been filed for this order'
-            ], 400);
-        }
-
-        $validated = $request->validate([
-            'reason' => ['required', 'string', 'max:1000'],
-            'evidence_images' => ['nullable', 'array', 'max:5'],
-            'evidence_images.*' => ['image', 'mimes:jpeg,png,jpg,gif,webp', 'max:5120'],
-        ]);
-
-        $imagePaths = [];
-
-        // อัปโหลดรูปหลักฐาน
-        if ($request->hasFile('evidence_images')) {
-            foreach ($request->file('evidence_images') as $image) {
-                $path = $image->store('disputes', 'public');
-                $imagePaths[] = $path;
-            }
-        }
-
-        DB::transaction(function () use ($order, $userId, $validated, $imagePaths) {
-            // สร้าง dispute (เก็บใน reports table type=dispute)
-            Report::create([
-                'order_id' => $order->id,
-                'reporter_id' => $userId,
-                'reported_user_id' => $order->seller_id,
-                'type' => 'dispute',
-                'description' => $validated['reason'],
-                'evidence_images' => $imagePaths ?: null,
-                'status' => 'open',
-            ]);
-
-            // อัปเดท order status
-            $order->status = 'disputed';
-            $order->save();
-
-            // แจ้งเตือนผู้ขาย
-            Notification::create([
-                'user_id' => $order->seller_id,
-                'type' => 'order',
-                'title' => 'Dispute filed ⚠️',
-                'message' => "The buyer has filed a dispute for {$order->product->name}. An admin will review the case.",
-                'product_id' => $order->product_id,
-            ]);
-        });
-
-        return response()->json([
-            'message' => 'Dispute filed successfully. An admin will review your case.',
         ]);
     }
 

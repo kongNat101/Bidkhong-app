@@ -37,6 +37,16 @@ class CloseExpiredAuctions extends Command
             if (!$winningBid) {
                 // ไม่มีคนประมูล -> เปลี่ยนสถานะเป็น cancelled
                 $product->update(['status' => 'cancelled']);
+
+                // แจ้ง seller ว่าประมูลจบแล้วแต่ไม่มีคน bid
+                \App\Models\Notification::create([
+                    'user_id' => $product->user_id,
+                    'type' => 'auction_ended_no_bids',
+                    'title' => 'การประมูลสิ้นสุดแล้ว',
+                    'message' => "การประมูล {$product->name} สิ้นสุดแล้วโดยไม่มีผู้เสนอราคา",
+                    'product_id' => $product->id,
+                ]);
+
                 $this->warn("Product #{$product->id} ({$product->name}) - No bids, marked as cancelled");
                 continue;
             }

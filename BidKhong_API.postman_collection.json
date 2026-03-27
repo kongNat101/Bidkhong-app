@@ -1078,7 +1078,7 @@
                 "transactions"
               ]
             },
-            "description": "Get wallet transaction history.\n\nTypes: topup, withdraw, bid_placed, bid_refund, auction_won, auction_sold, escrow_hold, escrow_release, escrow_refund"
+            "description": "Get wallet transaction history (last 20).\n\nShows: topup, withdraw, auction_sold (เงินเข้าจากขายสินค้า)"
           },
           "response": []
         }
@@ -1257,51 +1257,9 @@
             "description": "Buyer confirms item received.\n\nEffects:\n- Status: shipped → completed\n- Releases escrow payment to seller wallet\n- Notifies seller\n\nDeadline: 7 days, then auto-complete"
           },
           "response": []
-        },
-        {
-          "name": "Dispute Order (Buyer)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "formdata",
-              "formdata": [
-                {
-                  "key": "reason",
-                  "value": "Item not as described, received a different product",
-                  "type": "text",
-                  "description": "Reason for dispute (required, max 1000 chars)"
-                },
-                {
-                  "key": "evidence_images[]",
-                  "type": "file",
-                  "src": "",
-                  "description": "Evidence images (optional, max 5 files, each max 5MB)"
-                }
-              ]
-            },
-            "url": {
-              "raw": "{{base_url}}/orders/{{order_id}}/dispute",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "orders",
-                "{{order_id}}",
-                "dispute"
-              ]
-            },
-            "description": "Buyer files a dispute.\n\nOnly buyer can dispute. Must be in shipped status.\nRequired: reason. Optional: evidence_images (max 5).\nAdmin will review and resolve."
-          },
-          "response": []
         }
       ],
-      "description": "Post-auction escrow flow: confirm → ship → receive/dispute (5 endpoints)\n\nStatus: pending_buyer_confirm → confirmed → shipped → completed/disputed"
+      "description": "Post-auction escrow flow: confirm → ship → receive (4 endpoints)\n\nStatus: pending_buyer_confirm → confirmed → shipped → completed"
     },
     {
       "name": "🔔 Notifications",
@@ -1703,82 +1661,6 @@
         }
       ],
       "description": "⭐ Seller Rating system — buyer rates seller 1-5 stars (per order)\nPOST /users/{seller_id}/rate — rate a seller (ต้อง login + ระบุ order_id)\nGET /users/{seller_id}/ratings — ดูคะแนนผู้ขาย (public)"
-    },
-    {
-      "name": "🔍 Search History",
-      "item": [
-        {
-          "name": "Get Search History",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/search-history",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "search-history"
-              ]
-            },
-            "description": "🆕 ดึงประวัติค้นหา 20 อันล่าสุด (เรียงตาม updated_at desc)\n\nAuth: Required\n\nประวัติถูกบันทึกอัตโนมัติเมื่อ user ค้นหาสินค้าผ่าน GET /products?search=xxx"
-          },
-          "response": []
-        },
-        {
-          "name": "Delete One Search History",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/search-history/1",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "search-history",
-                "1"
-              ]
-            },
-            "description": "🆕 ลบประวัติค้นหา 1 อัน\n\nAuth: Required\nParam: search history ID"
-          },
-          "response": []
-        },
-        {
-          "name": "Clear All Search History",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/search-history",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "search-history"
-              ]
-            },
-            "description": "🆕 ลบประวัติค้นหาทั้งหมด (clear all)\n\nAuth: Required\nReturns: deleted_count"
-          },
-          "response": []
-        }
-      ],
-      "description": "🆕 Search History — บันทึกอัตโนมัติเมื่อค้นหาสินค้า\n3 endpoints: ดูประวัติ, ลบ 1 อัน, ลบทั้งหมด"
     },
     {
       "name": "🤖 Recommendations (AI)",
@@ -2371,9 +2253,209 @@
             "description": "🆕 ปลดแบน user\n\nSets all active strikes' banned_until = now()\nUser receives notification: บัญชีถูกปลดแบนแล้ว\n\nReturns 422 if user is not currently banned"
           },
           "response": []
+        },
+        {
+          "name": "Get Withdrawal Requests",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/withdrawals?status=pending",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "withdrawals"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending"
+                }
+              ]
+            },
+            "description": "🆕 ดูรายการถอนเงินทั้งหมด\n\nQuery: ?status=pending|confirmed|rejected (optional)\nDefault: แสดงทั้งหมด เรียง pending ก่อน\n\nIncludes: user info (name, email, phone)"
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm Withdrawal",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/withdrawals/1/confirm",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "withdrawals",
+                "1",
+                "confirm"
+              ]
+            },
+            "description": "🆕 ยืนยันการถอนเงิน (admin โอนเงินให้แล้ว)\n\nเปลี่ยน withdraw_status: pending → confirmed\nUser receives notification: ถอนเงินสำเร็จ"
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Withdrawal",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"admin_note\": \"ข้อมูลบัญชีไม่ถูกต้อง กรุณาตรวจสอบและส่งใหม่\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/withdrawals/1/reject",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "withdrawals",
+                "1",
+                "reject"
+              ]
+            },
+            "description": "🆕 ปฏิเสธการถอนเงิน + คืนเงินกลับ wallet\n\nRequired: admin_note (เหตุผล)\nเปลี่ยน withdraw_status: pending → rejected\nคืนเงินกลับ balance_available อัตโนมัติ\nUser receives notification + เหตุผล"
+          },
+          "response": []
+        },
+        {
+          "name": "Watch Product (Toggle)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/products/{{product_id}}/watch",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products",
+                "{{product_id}}",
+                "watch"
+              ]
+            },
+            "description": "🆕 กดติดตาม/ยกเลิกสินค้า (toggle)\n\nAuth: Required\nกดครั้งแรก → watching: true\nกดอีกครั้ง → watching: false\n\nเมื่อสินค้าเปิดประมูล → ได้รับ notification"
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Watchlist",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/me/watchlist",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "watchlist"
+              ]
+            },
+            "description": "🆕 ดูสินค้าที่ติดตาม\n\nAuth: Required\nIncludes: product name, picture, price, auction time, status"
+          },
+          "response": []
         }
       ],
-      "description": "Admin panel — requires admin role (13 endpoints)\n\n🆕 New: Product Approval (3), Unban (1)\n\nLogin as admin first, then use admin_token.\nDefault admin: admin@bidkhong.com / admin123"
+      "description": "Admin panel — requires admin role (16 endpoints) + Product Watch (2 endpoints)\n\n🆕 New: Withdrawals (3), Watch (2)\n\nLogin as admin first, then use admin_token.\nDefault admin: admin@bidkhong.com / admin123"
+    },
+    {
+      "name": "🌐 Public",
+      "item": [
+        {
+          "name": "Get Public Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/public/stats",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "public",
+                "stats"
+              ]
+            },
+            "description": "Public stats สำหรับหน้า Welcome\n\nไม่ต้อง login\nReturns: total_users (role=user), total_products (status=active)"
+          },
+          "response": []
+        }
+      ],
+      "description": "Public endpoints — no auth required (1 endpoint)"
     }
   ]
 }

@@ -171,11 +171,12 @@ class AuthController extends Controller
             return response()->json(['message' => 'Wallet not found'], 404);
         }
 
-        // อัปโหลดสลิป
-        $slipPath = $request->file('slip_image')->store('slips', 'public');
+        // เรียก Slip2Go API ก่อน store (เพื่อให้ getRealPath() ยังใช้ได้)
+        $slipFile = $request->file('slip_image');
+        $slipVerification = $this->verifySlipWithSlip2Go($slipFile);
 
-        // เรียก Slip2Go API เพื่อ verify สลิป
-        $slipVerification = $this->verifySlipWithSlip2Go($request->file('slip_image'));
+        // อัปโหลดสลิป (หลัง verify แล้ว)
+        $slipPath = $slipFile->store('slips', 'public');
 
         if (!$slipVerification['success']) {
             // สลิป verify ไม่ผ่าน → บันทึก transaction แต่ไม่เพิ่มเงิน
@@ -281,7 +282,7 @@ class AuthController extends Controller
     {
         $user = $request->user();
         $transactions = WalletTransaction::where('user_id', $user->id)
-            ->whereIn('type', ['topup', 'withdraw'])
+            ->whereIn('type', ['topup', 'withdraw', 'auction_sold'])
             ->orderBy('created_at', 'desc')
             ->limit(20)
             ->get();
@@ -320,14 +321,15 @@ class AuthController extends Controller
             $wallet->withdraw += $validated['amount'];
             $wallet->save();
 
-            // Create transaction record
+            // Create transaction record (status = pending → รอ admin confirm)
             WalletTransaction::create([
                 'user_id' => $user->id,
                 'wallet_id' => $wallet->id,
                 'type' => 'withdraw',
                 'amount' => -$validated['amount'],
-                'description' => "Withdraw to {$validated['bank_code']} - {$validated['account_number']}",
+                'description' => "Withdraw to {$validated['bank_code']} - {$validated['account_number']} ({$validated['account_name']})",
                 'balance_after' => $wallet->balance_available,
+                'withdraw_status' => 'pending',
             ]);
 
             return $wallet;

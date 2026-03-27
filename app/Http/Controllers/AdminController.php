@@ -524,6 +524,24 @@ class AdminController extends Controller
             'product_id' => $product->id,
         ]);
 
+        // แจ้ง watchers ถ้าสินค้าเริ่มประมูลทันที
+        if (!$product->auction_start_time || $product->auction_start_time->isPast()) {
+            $watcherIds = \App\Models\ProductWatch::where('product_id', $product->id)
+                ->pluck('user_id');
+
+            foreach ($watcherIds as $watcherId) {
+                if ($watcherId !== $product->user_id) {
+                    Notification::create([
+                        'user_id' => $watcherId,
+                        'type' => 'watched_auction_started',
+                        'title' => 'สินค้าที่คุณติดตามเปิดประมูลแล้ว!',
+                        'message' => "การประมูล {$product->name} เริ่มแล้ว! เข้าไปเสนอราคาเลย!",
+                        'product_id' => $product->id,
+                    ]);
+                }
+            }
+        }
+
         return response()->json([
             'message' => 'Product approved successfully.',
             'product' => $product->fresh(['user:id,name', 'images']),
@@ -564,6 +582,102 @@ class AdminController extends Controller
         return response()->json([
             'message' => 'Product rejected.',
             'product' => $product->fresh(['user:id,name', 'images']),
+        ]);
+    }
+
+    // === Withdrawal Management ===
+
+    // GET /api/admin/withdrawals - ดูรายการถอนเงินทั้งหมด
+    public function withdrawals(Request $request)
+    {
+        $query = WalletTransaction::where('type', 'withdraw')
+            ->with(['user:id,name,email,phone_number']);
+
+        // กรองตาม status (?status=pending)
+        if ($request->has('status')) {
+            $query->where('withdraw_status', $request->status);
+        }
+
+        $withdrawals = $query->orderByRaw("FIELD(withdraw_status, 'pending', 'confirmed', 'rejected')")
+            ->orderBy('created_at', 'desc')
+            ->paginate(20);
+
+        return response()->json($withdrawals);
+    }
+
+    // PATCH /api/admin/withdrawals/{id}/confirm - ยืนยันการถอนเงิน (โอนเงินให้แล้ว)
+    public function confirmWithdrawal(Request $request, $id)
+    {
+        $transaction = WalletTransaction::where('type', 'withdraw')->findOrFail($id);
+
+        if ($transaction->withdraw_status !== 'pending') {
+            return response()->json([
+                'message' => 'This withdrawal has already been processed. Status: ' . $transaction->withdraw_status,
+            ], 422);
+        }
+
+        $transaction->update([
+            'withdraw_status' => 'confirmed',
+            'confirmed_by' => $request->user()->id,
+            'confirmed_at' => now(),
+        ]);
+
+        // แจ้งเตือน user
+        Notification::create([
+            'user_id' => $transaction->user_id,
+            'type' => 'system',
+            'title' => 'ถอนเงินสำเร็จ',
+            'message' => 'การถอนเงิน ' . number_format(abs($transaction->amount)) . ' บาท ได้รับการยืนยันแล้ว เงินจะโอนเข้าบัญชีของคุณ',
+        ]);
+
+        return response()->json([
+            'message' => 'Withdrawal confirmed.',
+            'transaction' => $transaction->fresh(['user:id,name']),
+        ]);
+    }
+
+    // PATCH /api/admin/withdrawals/{id}/reject - ปฏิเสธการถอนเงิน (คืนเงินกลับ wallet)
+    public function rejectWithdrawal(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'admin_note' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $transaction = WalletTransaction::where('type', 'withdraw')->findOrFail($id);
+
+        if ($transaction->withdraw_status !== 'pending') {
+            return response()->json([
+                'message' => 'This withdrawal has already been processed. Status: ' . $transaction->withdraw_status,
+            ], 422);
+        }
+
+        // คืนเงินกลับ wallet
+        $wallet = $transaction->user->wallet;
+        if ($wallet) {
+            $wallet->balance_available += abs($transaction->amount);
+            $wallet->balance_total += abs($transaction->amount);
+            $wallet->withdraw -= abs($transaction->amount);
+            $wallet->save();
+        }
+
+        $transaction->update([
+            'withdraw_status' => 'rejected',
+            'confirmed_by' => $request->user()->id,
+            'confirmed_at' => now(),
+            'description' => $transaction->description . " [REJECTED: {$validated['admin_note']}]",
+        ]);
+
+        // แจ้งเตือน user
+        Notification::create([
+            'user_id' => $transaction->user_id,
+            'type' => 'system',
+            'title' => 'การถอนเงินถูกปฏิเสธ',
+            'message' => 'การถอนเงิน ' . number_format(abs($transaction->amount)) . " บาท ถูกปฏิเสธ เหตุผล: {$validated['admin_note']} เงินถูกคืนกลับเข้า wallet แล้ว",
+        ]);
+
+        return response()->json([
+            'message' => 'Withdrawal rejected. Funds returned to user wallet.',
+            'transaction' => $transaction->fresh(['user:id,name']),
         ]);
     }
 }
