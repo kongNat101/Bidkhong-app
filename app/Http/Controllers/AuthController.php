@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\User;
+use App\Models\Wallet;
 use App\Models\WalletTransaction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -160,7 +161,7 @@ class AuthController extends Controller
     public function topup(Request $request)
     {
         $validated = $request->validate([
-            'amount' => ['required', 'numeric', 'min:1'],
+            'amount' => ['required', 'numeric', 'min:1', 'max:100000'],
             'slip_image' => ['required', 'image', 'mimes:jpeg,png,jpg', 'max:5120'],
         ]);
 
@@ -198,31 +199,79 @@ class AuthController extends Controller
             ], 400);
         }
 
-        // สลิป verify สำเร็จ → เพิ่มเงิน
-        $result = DB::transaction(function () use ($wallet, $validated, $user, $slipPath, $slipVerification) {
-            $wallet = $wallet->lockForUpdate()->find($wallet->id);
+        $slipData = $slipVerification['data'];
+        $slipAmount = $slipData['amount'] ?? null;
+        $slipRef = $slipData['transRef'] ?? null;
 
-            $wallet->balance_available += $validated['amount'];
-            $wallet->balance_total += $validated['amount'];
-            $wallet->deposit += $validated['amount'];
-            $wallet->save();
-
-            // Create transaction record
+        // ตรวจสอบยอดเงินในสลิปตรงกับที่ส่งมาหรือไม่ (ใช้ bccomp ป้องกัน float error)
+        if ($slipAmount !== null && bccomp((string) $slipAmount, (string) $validated['amount'], 2) !== 0) {
             WalletTransaction::create([
                 'user_id' => $user->id,
                 'wallet_id' => $wallet->id,
                 'type' => 'topup',
                 'amount' => $validated['amount'],
-                'description' => 'Top Up - Mobile Banking',
+                'description' => "Top Up - Amount mismatch (slip: {$slipAmount}, request: {$validated['amount']})",
                 'balance_after' => $wallet->balance_available,
                 'slip_image' => $slipPath,
-                'slip_status' => 'verified',
-                'slip_data' => $slipVerification['data'],
-                'verified_at' => now(),
+                'slip_status' => 'rejected',
+                'slip_data' => $slipData,
+                'slip_ref' => $slipRef,
             ]);
 
-            return $wallet;
-        });
+            return response()->json([
+                'message' => "Amount mismatch: slip amount is {$slipAmount} but requested {$validated['amount']}",
+                'slip_status' => 'rejected',
+            ], 400);
+        }
+
+        // ตรวจสอบสลิปซ้ำ (duplicate slip)
+        if ($slipRef && WalletTransaction::where('slip_ref', $slipRef)->exists()) {
+            return response()->json([
+                'message' => 'This slip has already been used',
+                'slip_status' => 'rejected',
+            ], 400);
+        }
+
+        // สลิป verify สำเร็จ → เพิ่มเงินใน DB transaction เพื่อป้องกัน race condition
+        try {
+            $result = DB::transaction(function () use ($wallet, $validated, $user, $slipPath, $slipData, $slipRef) {
+                $wallet = Wallet::lockForUpdate()->find($wallet->id);
+
+                // Double-check สลิปซ้ำภายใน transaction (ป้องกัน race condition)
+                if ($slipRef && WalletTransaction::where('slip_ref', $slipRef)->exists()) {
+                    throw new \Exception('Duplicate slip detected');
+                }
+
+                $wallet->balance_available += $validated['amount'];
+                $wallet->balance_total += $validated['amount'];
+                $wallet->deposit += $validated['amount'];
+                $wallet->save();
+
+                WalletTransaction::create([
+                    'user_id' => $user->id,
+                    'wallet_id' => $wallet->id,
+                    'type' => 'topup',
+                    'amount' => $validated['amount'],
+                    'description' => 'Top Up - Mobile Banking',
+                    'balance_after' => $wallet->balance_available,
+                    'slip_image' => $slipPath,
+                    'slip_status' => 'verified',
+                    'slip_data' => $slipData,
+                    'slip_ref' => $slipRef,
+                    'verified_at' => now(),
+                ]);
+
+                return $wallet;
+            });
+        } catch (\Exception $e) {
+            if (str_contains($e->getMessage(), 'Duplicate') || str_contains($e->getMessage(), 'slip_ref')) {
+                return response()->json([
+                    'message' => 'This slip has already been used',
+                    'slip_status' => 'rejected',
+                ], 400);
+            }
+            throw $e;
+        }
 
         return response()->json([
             'message' => 'Topup successful',
@@ -238,19 +287,27 @@ class AuthController extends Controller
         $baseUrl = config('services.slip2go.base_url');
 
         if (!$apiKey) {
-            // ถ้ายังไม่ได้ตั้งค่า API key → ให้ผ่านเลย (dev mode)
+            // ถ้ายังไม่ได้ตั้งค่า API key → dev mode เฉพาะ local เท่านั้น
+            if (app()->environment('local')) {
+                return [
+                    'success' => true,
+                    'data' => ['message' => 'Slip2Go API key not configured - auto approved (dev mode)'],
+                    'reason' => null,
+                ];
+            }
+            // Production/staging ต้องมี API key เสมอ
             return [
-                'success' => true,
-                'data' => ['message' => 'Slip2Go API key not configured - auto approved (dev mode)'],
-                'reason' => null,
+                'success' => false,
+                'data' => ['error' => 'Slip verification service not configured'],
+                'reason' => 'Slip verification service not configured',
             ];
         }
 
         try {
             $response = Http::withHeaders([
-                'x-authorization' => $apiKey,
+                'Authorization' => "Bearer {$apiKey}",
             ])->attach(
-                'files', file_get_contents($slipFile->getRealPath()), $slipFile->getClientOriginalName()
+                'file', file_get_contents($slipFile->getRealPath()), $slipFile->getClientOriginalName()
             )->post("{$baseUrl}/api/verify-slip/qr-image/info");
 
             $data = $response->json();

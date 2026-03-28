@@ -22,6 +22,7 @@ class WalletTransaction extends Model
         'withdraw_status',
         'confirmed_by',
         'confirmed_at',
+        'slip_ref',
     ];
 
     protected $casts = [
