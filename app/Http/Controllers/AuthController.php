@@ -284,7 +284,7 @@ class AuthController extends Controller
     private function verifySlipWithSlip2Go($slipFile): array
     {
         $apiKey = config('services.slip2go.api_key');
-        $baseUrl = config('services.slip2go.base_url');
+        $baseUrl = rtrim(config('services.slip2go.base_url'), '/');
 
         if (!$apiKey) {
             // ถ้ายังไม่ได้ตั้งค่า API key → dev mode เฉพาะ local เท่านั้น

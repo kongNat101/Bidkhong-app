@@ -37,7 +37,7 @@ return [
 
     'slip2go' => [
         'api_key' => env('SLIP2GO_API_KEY'),
-        'base_url' => env('SLIP2GO_BASE_URL', 'https://api.slip2go.com'),
+        'base_url' => env('SLIP2GO_BASE_URL', 'https://connect.slip2go.com'),
     ],
 
     'recommendation' => [

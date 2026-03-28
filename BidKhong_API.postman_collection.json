@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "BidKhong Auction API",
-    "description": "Complete API collection for BidKhong online auction platform.\nUpdated: 25 Mar 2026 — includes Search History, Recommendations, Admin Approval, Slip Verify, Anti-sniping, Seller Rating, Unban.\n\nTotal: 61 endpoints across 14 folders.",
+    "description": "Complete API collection for BidKhong online auction platform.\nUpdated: 25 Mar 2026 — includes Search History, Recommendations, Admin Approval, Slip Verify, Anti-sniping, Seller Rating, Unban.\n\nTotal: 62 endpoints across 14 folders.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "BidKhong"
   },
@@ -1059,6 +1059,29 @@
           "response": []
         },
         {
+          "name": "Get Wallet Balance",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/wallet",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wallet"
+              ]
+            },
+            "description": "Get current wallet balance (realtime).\n\nReturns: balance_available, balance_total, balance_pending, withdraw, deposit"
+          },
+          "response": []
+        },
+        {
           "name": "Get Wallet Transactions",
           "request": {
             "method": "GET",
@@ -1083,7 +1106,7 @@
           "response": []
         }
       ],
-      "description": "Wallet management: top up, withdraw, transaction history (3 endpoints)"
+      "description": "Wallet management: balance, top up, withdraw, transaction history (4 endpoints)"
     },
     {
       "name": "🛒 Orders",
