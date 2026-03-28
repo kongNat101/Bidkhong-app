@@ -46,7 +46,9 @@ Route::middleware('throttle:60,1')->group(function () {
     Route::get('/public/stats', function () {
         return response()->json([
             'total_users' => \App\Models\User::where('role', 'user')->count(),
-            'total_products' => \App\Models\Product::where('status', 'active')->count(),
+            'active_auctions' => \App\Models\Product::where('status', 'active')
+                ->where('auction_end_time', '>', now())
+                ->count(),
         ]);
     });
 });
@@ -61,6 +63,7 @@ Route::middleware(['auth:sanctum', 'check-banned', 'throttle:100,1'])->group(fun
     Route::post('/change-password', [AuthController::class , 'changePassword']);
 
     // Wallet
+    Route::get('/wallet', [AuthController::class , 'getWallet']);
     Route::post('/wallet/topup', [AuthController::class , 'topup']);
     Route::post('/wallet/withdraw', [AuthController::class , 'withdraw']);
     Route::get('/wallet/transactions', [AuthController::class , 'getTransactions']);

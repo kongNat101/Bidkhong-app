@@ -28,6 +28,7 @@ class AdminController extends Controller
             'pending_reports' => Report::where('type', '!=', 'dispute')->where('status', 'pending')->count(),
             'pending_products' => Product::where('status', 'pending')->count(),
             'pending_certificates' => ProductCertificate::where('status', 'pending')->count(),
+            'pending_withdrawals' => WalletTransaction::where('type', 'withdraw')->where('withdraw_status', 'pending')->count(),
             'recent_orders' => Order::with(['product:id,name', 'user:id,name', 'seller:id,name'])
                 ->orderBy('created_at', 'desc')
                 ->take(10)
@@ -639,10 +640,6 @@ class AdminController extends Controller
     // PATCH /api/admin/withdrawals/{id}/reject - ปฏิเสธการถอนเงิน (คืนเงินกลับ wallet)
     public function rejectWithdrawal(Request $request, $id)
     {
-        $validated = $request->validate([
-            'admin_note' => ['required', 'string', 'max:1000'],
-        ]);
-
         $transaction = WalletTransaction::where('type', 'withdraw')->findOrFail($id);
 
         if ($transaction->withdraw_status !== 'pending') {
@@ -664,7 +661,6 @@ class AdminController extends Controller
             'withdraw_status' => 'rejected',
             'confirmed_by' => $request->user()->id,
             'confirmed_at' => now(),
-            'description' => $transaction->description . " [REJECTED: {$validated['admin_note']}]",
         ]);
 
         // แจ้งเตือน user
@@ -672,7 +668,7 @@ class AdminController extends Controller
             'user_id' => $transaction->user_id,
             'type' => 'system',
             'title' => 'การถอนเงินถูกปฏิเสธ',
-            'message' => 'การถอนเงิน ' . number_format(abs($transaction->amount)) . " บาท ถูกปฏิเสธ เหตุผล: {$validated['admin_note']} เงินถูกคืนกลับเข้า wallet แล้ว",
+            'message' => 'การถอนเงิน ' . number_format(abs($transaction->amount)) . ' บาท ถูกปฏิเสธ เงินถูกคืนกลับเข้า wallet แล้ว',
         ]);
 
         return response()->json([

@@ -334,6 +334,24 @@ class AuthController extends Controller
         }
     }
 
+    // GET /api/wallet - ดูยอดเงินใน wallet (realtime)
+    public function getWallet(Request $request)
+    {
+        $wallet = $request->user()->wallet;
+
+        if (!$wallet) {
+            return response()->json(['message' => 'Wallet not found'], 404);
+        }
+
+        return response()->json([
+            'balance_available' => $wallet->balance_available,
+            'balance_total' => $wallet->balance_total,
+            'balance_pending' => $wallet->balance_pending,
+            'withdraw' => $wallet->withdraw,
+            'deposit' => $wallet->deposit,
+        ]);
+    }
+
     // GET /api/wallet/transactions - Get wallet transactions (topup + withdraw เท่านั้น)
     public function getTransactions(Request $request)
     {
@@ -387,6 +405,9 @@ class AuthController extends Controller
                 'description' => "Withdraw to {$validated['bank_code']} - {$validated['account_number']} ({$validated['account_name']})",
                 'balance_after' => $wallet->balance_available,
                 'withdraw_status' => 'pending',
+                'bank_code' => $validated['bank_code'],
+                'account_number' => $validated['account_number'],
+                'account_name' => $validated['account_name'],
             ]);
 
             return $wallet;

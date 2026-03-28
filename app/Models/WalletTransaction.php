@@ -23,6 +23,9 @@ class WalletTransaction extends Model
         'confirmed_by',
         'confirmed_at',
         'slip_ref',
+        'bank_code',
+        'account_number',
+        'account_name',
     ];
 
     protected $casts = [
