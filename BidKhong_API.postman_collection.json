@@ -1971,7 +1971,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"reason\": \"Repeated scam reports\",\n  \"duration_days\": 30\n}"
+              "raw": "{\n  \"reason\": \"Repeated scam reports\",\n  \"ban_days\": 30\n}"
             },
             "url": {
               "raw": "{{base_url}}/admin/users/{{user_id}}/ban",
