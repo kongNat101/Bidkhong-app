@@ -29,7 +29,7 @@ class AdminController extends Controller
             'pending_products' => Product::where('status', 'pending')->count(),
             'pending_certificates' => ProductCertificate::where('status', 'pending')->count(),
             'pending_withdrawals' => WalletTransaction::where('type', 'withdraw')->where('withdraw_status', 'pending')->count(),
-            'recent_orders' => Order::with(['product:id,name', 'user:id,name', 'seller:id,name'])
+            'recent_orders' => Order::with(['product:id,name', 'user:id,name,profile_image', 'seller:id,name,profile_image'])
                 ->orderBy('created_at', 'desc')
                 ->take(10)
                 ->get(),
@@ -44,8 +44,8 @@ class AdminController extends Controller
             'reportedUser:id,name,email',
             'reportedProduct:id,name',
             'order.product:id,name',
-            'order.user:id,name',
-            'order.seller:id,name',
+            'order.user:id,name,profile_image',
+            'order.seller:id,name,profile_image',
             'repliedBy:id,name',
         ]);
 
@@ -410,7 +410,7 @@ class AdminController extends Controller
     {
         $query = ProductCertificate::with([
             'product:id,name,user_id',
-            'product.user:id,name,email',
+            'product.user:id,name,email,profile_image',
             'verifier:id,name',
         ]);
 
@@ -436,7 +436,7 @@ class AdminController extends Controller
         }
 
         return response()->json([
-            'certificate' => $cert->load(['product:id,name,user_id', 'product.user:id,name']),
+            'certificate' => $cert->load(['product:id,name,user_id', 'product.user:id,name,profile_image']),
             'download_url' => asset('storage/' . $cert->file_path),
         ]);
     }
@@ -483,7 +483,7 @@ class AdminController extends Controller
     public function pendingProducts(Request $request)
     {
         $query = Product::with([
-            'user:id,name,email',
+            'user:id,name,email,profile_image',
             'category:id,name',
             'subcategory:id,name',
             'images',
@@ -545,7 +545,7 @@ class AdminController extends Controller
 
         return response()->json([
             'message' => 'Product approved successfully.',
-            'product' => $product->fresh(['user:id,name', 'images']),
+            'product' => $product->fresh(['user:id,name,profile_image', 'images']),
         ]);
     }
 
@@ -582,7 +582,7 @@ class AdminController extends Controller
 
         return response()->json([
             'message' => 'Product rejected.',
-            'product' => $product->fresh(['user:id,name', 'images']),
+            'product' => $product->fresh(['user:id,name,profile_image', 'images']),
         ]);
     }
 
@@ -592,7 +592,7 @@ class AdminController extends Controller
     public function withdrawals(Request $request)
     {
         $query = WalletTransaction::where('type', 'withdraw')
-            ->with(['user:id,name,email,phone_number']);
+            ->with(['user:id,name,email,phone_number,profile_image']);
 
         // กรองตาม status (?status=pending)
         if ($request->has('status')) {
@@ -633,7 +633,7 @@ class AdminController extends Controller
 
         return response()->json([
             'message' => 'Withdrawal confirmed.',
-            'transaction' => $transaction->fresh(['user:id,name']),
+            'transaction' => $transaction->fresh(['user:id,name,profile_image']),
         ]);
     }
 
@@ -673,7 +673,7 @@ class AdminController extends Controller
 
         return response()->json([
             'message' => 'Withdrawal rejected. Funds returned to user wallet.',
-            'transaction' => $transaction->fresh(['user:id,name']),
+            'transaction' => $transaction->fresh(['user:id,name,profile_image']),
         ]);
     }
 }

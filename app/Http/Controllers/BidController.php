@@ -69,7 +69,11 @@ class BidController extends Controller
             ], 400);
         }
 
+        try {
         DB::transaction(function () use ($product, $user, $validated, $wallet) {
+            // Lock wallet ก่อนเพื่อป้องกัน race condition
+            $wallet = \App\Models\Wallet::lockForUpdate()->find($wallet->id);
+
             // หา bid เก่าที่ active
             $previousBids = Bid::where('product_id', $product->id)
                 ->where('status', 'active')
@@ -80,7 +84,7 @@ class BidController extends Controller
                 $oldBid->update(['status' => 'outbid']);
 
                 // Refund เงินให้คนที่ถูกประมูลทับ
-                $oldBidWallet = $oldBid->user->wallet;
+                $oldBidWallet = \App\Models\Wallet::lockForUpdate()->find($oldBid->user->wallet->id);
                 if ($oldBidWallet) {
                     $oldBidWallet->balance_available += $oldBid->price;
                     $oldBidWallet->balance_pending -= $oldBid->price;
@@ -110,7 +114,12 @@ class BidController extends Controller
             }
 
             // โหลด wallet ใหม่จาก DB (กรณี bid สินค้าเดิมซ้ำ — refund ด้านบนอาจแก้ wallet เดียวกัน)
-            $wallet->refresh();
+            $wallet = \App\Models\Wallet::lockForUpdate()->find($wallet->id);
+
+            // Re-check balance ภายใน transaction
+            if ($wallet->balance_available < $validated['price']) {
+                throw new \Exception('Insufficient balance');
+            }
 
             // หักเงินจาก wallet
             $wallet->balance_available -= $validated['price'];
@@ -149,6 +158,12 @@ class BidController extends Controller
                 $product->save();
             }
         });
+        } catch (\Exception $e) {
+            if (str_contains($e->getMessage(), 'Insufficient balance')) {
+                return response()->json(['message' => 'Insufficient balance'], 400);
+            }
+            throw $e;
+        }
 
         // โหลดเวลาใหม่ (อาจถูก anti-sniping ขยายเวลา)
         $product->refresh();
@@ -164,7 +179,7 @@ class BidController extends Controller
     public function getProductBids($productId)
     {
         $bids = Bid::where('product_id', $productId)
-            ->with('user:id,name')
+            ->with('user:id,name,profile_image')
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -276,7 +291,16 @@ class BidController extends Controller
             ], 400);
         }
 
+        try {
         DB::transaction(function () use ($product, $user, $wallet) {
+            // Lock buyer wallet ก่อน
+            $wallet = \App\Models\Wallet::lockForUpdate()->find($wallet->id);
+
+            // Re-check balance ภายใน transaction
+            if ($wallet->balance_available < $product->buyout_price) {
+                throw new \Exception('Insufficient balance');
+            }
+
             // Refund all existing active bids
             $activeBids = Bid::where('product_id', $product->id)
                 ->where('status', 'active')
@@ -286,7 +310,7 @@ class BidController extends Controller
                 $oldBid->update(['status' => 'lost']);
 
                 // Refund เงินให้คนที่ประมูลอยู่
-                $oldBidWallet = $oldBid->user->wallet;
+                $oldBidWallet = \App\Models\Wallet::lockForUpdate()->find($oldBid->user->wallet->id);
                 if ($oldBidWallet) {
                     $oldBidWallet->balance_available += $oldBid->price;
                     $oldBidWallet->balance_pending -= $oldBid->price;
@@ -333,7 +357,7 @@ class BidController extends Controller
             ]);
 
             // โอนเงินให้ seller
-            $sellerWallet = $product->user->wallet;
+            $sellerWallet = \App\Models\Wallet::lockForUpdate()->where('user_id', $product->user_id)->first();
             if ($sellerWallet) {
                 $sellerWallet->balance_available += $product->buyout_price;
                 $sellerWallet->balance_total += $product->buyout_price;
@@ -394,6 +418,12 @@ class BidController extends Controller
                 'product_id' => $product->id,
             ]);
         });
+        } catch (\Exception $e) {
+            if (str_contains($e->getMessage(), 'Insufficient balance')) {
+                return response()->json(['message' => 'Insufficient balance'], 400);
+            }
+            throw $e;
+        }
 
         return response()->json([
             'message' => 'Purchase successful',

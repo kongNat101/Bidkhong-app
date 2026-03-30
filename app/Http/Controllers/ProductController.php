@@ -13,7 +13,7 @@ class ProductController extends Controller
     //GET /api/products = ดูรายละเอียดสินค้า (พร้อม search, filter, sort)
     public function index(Request $request)
     {
-        $query = Product::with(['images', 'user:id,name,phone_number'])->withCount('bids');
+        $query = Product::with(['images', 'user:id,name,phone_number,profile_image'])->withCount('bids');
 
         // 🔍 ค้นหาตามชื่อหรือรายละเอียด
         $query->when($request->search, function ($q, $search) {
@@ -110,7 +110,7 @@ class ProductController extends Controller
     //GET /api/products/{id} = ดูรายละเอียดสินค้าแค่ชิ้นเดียว
     public function show($id)
     {
-        $product = Product::with(['images', 'user:id,name,phone_number'])->withCount('bids')->find($id);
+        $product = Product::with(['images', 'user:id,name,phone_number,profile_image'])->withCount('bids')->find($id);
 
         if (!$product) {
             return response()->json(['message' => 'Product not found'], 404);
@@ -122,17 +122,19 @@ class ProductController extends Controller
         $response['seller'] = [
             'name' => $product->user->name,
             'phone_number' => $product->user->phone_number,
+            'profile_image' => $product->user->profile_image,
         ];
 
         // ข้อมูล bids
         $response['total_bids'] = $product->bids_count;
         $response['latest_bidders'] = $product->bids()
-            ->with('user:id,name')
+            ->with('user:id,name,profile_image')
             ->orderByDesc('time')
             ->take(5)
             ->get()
             ->map(fn($bid) => [
         'name' => $bid->user->name,
+        'profile_image' => $bid->user->profile_image,
         'price' => $bid->price,
         'time' => $bid->time,
         ]);

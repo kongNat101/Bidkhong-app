@@ -337,7 +337,7 @@ class AuthController extends Controller
     // GET /api/wallet - ดูยอดเงินใน wallet (realtime)
     public function getWallet(Request $request)
     {
-        $wallet = $request->user()->wallet;
+        $wallet = Wallet::where('user_id', $request->user()->id)->first();
 
         if (!$wallet) {
             return response()->json(['message' => 'Wallet not found'], 404);

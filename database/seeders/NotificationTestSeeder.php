@@ -10,6 +10,7 @@ use App\Models\Category;
 use App\Models\Subcategory;
 use App\Models\ProductWatch;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Storage;
 
 class NotificationTestSeeder extends Seeder
 {
@@ -79,6 +80,12 @@ class NotificationTestSeeder extends Seeder
             $buyerB->wallet->update(['balance_available' => 500000, 'balance_total' => 500000, 'deposit' => 500000]);
         }
         echo "✓ Buyer B: buyerB@noti.test / password123 (balance: 500,000)\n";
+
+        // === ดาวน์โหลดรูปโปรไฟล์ ===
+        $this->downloadProfileImage($seller, 'seller');
+        $this->downloadProfileImage($buyerA, 'buyer-a');
+        $this->downloadProfileImage($buyerB, 'buyer-b');
+        echo "✓ ดาวน์โหลดรูปโปรไฟล์ให้ทุก account แล้ว\n";
 
         // === 5. หา category ===
         $category = Category::first();
@@ -283,5 +290,29 @@ class NotificationTestSeeder extends Seeder
         echo "      → Buyer B ได้ noti 'won', Buyer A ได้ noti 'lost', Seller ได้ noti 'sold' (ID {$productExpiredWithBids->id})\n";
         echo "   7. Post-Auction: confirm → ship → receive (ดูคู่มือทดสอบ)\n";
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+    }
+
+    private function downloadProfileImage(User $user, string $seed): void
+    {
+        try {
+            Storage::disk('public')->makeDirectory('profiles');
+            $filename = "profiles/seed_{$seed}.jpg";
+
+            if (!Storage::disk('public')->exists($filename)) {
+                $imageUrl = "https://picsum.photos/seed/{$seed}/200/200";
+                $context = stream_context_create(['http' => ['timeout' => 10, 'follow_location' => true]]);
+                $imageContent = @file_get_contents($imageUrl, false, $context);
+
+                if ($imageContent && strlen($imageContent) > 500) {
+                    Storage::disk('public')->put($filename, $imageContent);
+                }
+            }
+
+            if (Storage::disk('public')->exists($filename)) {
+                $user->update(['profile_image' => $filename]);
+            }
+        } catch (\Exception $e) {
+            echo "  ⚠ Skip profile image for {$seed}\n";
+        }
     }
 }

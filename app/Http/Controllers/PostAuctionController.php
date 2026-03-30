@@ -66,7 +66,7 @@ class PostAuctionController extends Controller
             $order->save();
 
             // Hold เงินจาก wallet ผู้ชนะ (escrow)
-            $buyerWallet = $order->user->wallet;
+            $buyerWallet = \App\Models\Wallet::lockForUpdate()->where('user_id', $order->user_id)->first();
             if ($buyerWallet) {
                 // เช็คว่ามีเงินพอ
                 if ($buyerWallet->balance_available < $order->final_price) {
@@ -128,7 +128,7 @@ class PostAuctionController extends Controller
     // GET /api/orders/{id}/detail — ดูรายละเอียด order + contact ทั้ง 2 ฝั่ง (เปิดเผยทันที)
     public function detail(Request $request, $id)
     {
-        $order = Order::with(['product', 'user:id,name,phone_number', 'seller:id,name,phone_number'])
+        $order = Order::with(['product', 'user:id,name,phone_number,profile_image', 'seller:id,name,phone_number,profile_image'])
             ->findOrFail($id);
         $userId = $request->user()->id;
 
@@ -145,10 +145,12 @@ class PostAuctionController extends Controller
             'buyer_contact' => [
                 'name' => $order->user->name,
                 'phone_number' => $order->user->phone_number,
+                'profile_image' => $order->user->profile_image,
             ],
             'seller_contact' => [
                 'name' => $order->seller->name,
                 'phone_number' => $order->seller->phone_number,
+                'profile_image' => $order->seller->profile_image,
             ],
         ];
 
@@ -238,7 +240,7 @@ class PostAuctionController extends Controller
     private function releaseEscrow(Order $order): void
     {
         // หัก pending จาก buyer
-        $buyerWallet = $order->user->wallet;
+        $buyerWallet = \App\Models\Wallet::lockForUpdate()->where('user_id', $order->user_id)->first();
         if ($buyerWallet) {
             $buyerWallet->balance_pending -= $order->final_price;
             $buyerWallet->balance_total -= $order->final_price;
@@ -257,7 +259,7 @@ class PostAuctionController extends Controller
         }
 
         // โอนเข้า wallet ผู้ขาย
-        $sellerWallet = $order->seller->wallet;
+        $sellerWallet = \App\Models\Wallet::lockForUpdate()->where('user_id', $order->seller_id)->first();
         if ($sellerWallet) {
             $sellerWallet->balance_available += $order->final_price;
             $sellerWallet->balance_total += $order->final_price;

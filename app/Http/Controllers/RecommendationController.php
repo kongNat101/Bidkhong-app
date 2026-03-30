@@ -25,7 +25,7 @@ class RecommendationController extends Controller
                 $source = $response->json('source', 'unknown');
 
                 if (!empty($productIds)) {
-                    $products = Product::with(['images', 'user:id,name,phone_number'])
+                    $products = Product::with(['images', 'user:id,name,phone_number,profile_image'])
                         ->withCount('bids')
                         ->whereIn('id', $productIds)
                         ->where('status', 'active')
@@ -64,7 +64,7 @@ class RecommendationController extends Controller
                 $source = $response->json('source', 'unknown');
 
                 if (!empty($productIds)) {
-                    $products = Product::with(['images', 'user:id,name,phone_number'])
+                    $products = Product::with(['images', 'user:id,name,phone_number,profile_image'])
                         ->withCount('bids')
                         ->whereIn('id', $productIds)
                         ->where('status', 'active')
@@ -90,7 +90,7 @@ class RecommendationController extends Controller
     // Fallback: สินค้า active ยอดนิยม (เรียงตาม bid count)
     private function fallbackRecommendations($limit)
     {
-        $products = Product::with(['images', 'user:id,name,phone_number'])
+        $products = Product::with(['images', 'user:id,name,phone_number,profile_image'])
             ->withCount('bids')
             ->where('status', 'active')
             ->orderByDesc('bids_count')
@@ -113,7 +113,7 @@ class RecommendationController extends Controller
             return response()->json(['message' => 'Product not found'], 404);
         }
 
-        $query = Product::with(['images', 'user:id,name,phone_number'])
+        $query = Product::with(['images', 'user:id,name,phone_number,profile_image'])
             ->withCount('bids')
             ->where('status', 'active')
             ->where('id', '!=', $id);
