@@ -118,10 +118,16 @@ class PostAuctionController extends Controller
         });
 
         $order->refresh();
+        $freshWallet = \App\Models\Wallet::where('user_id', $request->user()->id)->first();
 
         return response()->json([
             'message' => 'Order confirmed successfully',
             'order_status' => $order->status,
+            'wallet' => [
+                'balance_available' => $freshWallet->balance_available,
+                'balance_pending' => $freshWallet->balance_pending,
+                'balance_total' => $freshWallet->balance_total,
+            ],
         ]);
     }
 
@@ -231,8 +237,15 @@ class PostAuctionController extends Controller
             $this->releaseEscrow($order);
         });
 
+        $freshWallet = \App\Models\Wallet::where('user_id', $request->user()->id)->first();
+
         return response()->json([
             'message' => 'Order completed! Payment released to seller.',
+            'wallet' => [
+                'balance_available' => $freshWallet->balance_available,
+                'balance_pending' => $freshWallet->balance_pending,
+                'balance_total' => $freshWallet->balance_total,
+            ],
         ]);
     }
 

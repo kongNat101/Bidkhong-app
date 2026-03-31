@@ -167,11 +167,17 @@ class BidController extends Controller
 
         // โหลดเวลาใหม่ (อาจถูก anti-sniping ขยายเวลา)
         $product->refresh();
+        $freshWallet = \App\Models\Wallet::where('user_id', $user->id)->first();
 
         return response()->json([
             'message' => 'Bid placed successfully',
             'current_price' => $validated['price'],
             'auction_end_time' => $product->auction_end_time,
+            'wallet' => [
+                'balance_available' => $freshWallet->balance_available,
+                'balance_pending' => $freshWallet->balance_pending,
+                'balance_total' => $freshWallet->balance_total,
+            ],
         ], 201);
     }
 
@@ -425,9 +431,16 @@ class BidController extends Controller
             throw $e;
         }
 
+        $freshWallet = \App\Models\Wallet::where('user_id', $user->id)->first();
+
         return response()->json([
             'message' => 'Purchase successful',
             'product' => $product->fresh(),
+            'wallet' => [
+                'balance_available' => $freshWallet->balance_available,
+                'balance_pending' => $freshWallet->balance_pending,
+                'balance_total' => $freshWallet->balance_total,
+            ],
         ], 200);
     }
 }

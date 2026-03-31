@@ -275,8 +275,14 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Topup successful',
-            'balance_available' => $result->balance_available,
             'slip_status' => 'verified',
+            'wallet' => [
+                'balance_available' => $result->balance_available,
+                'balance_total' => $result->balance_total,
+                'balance_pending' => $result->balance_pending,
+                'withdraw' => $result->withdraw,
+                'deposit' => $result->deposit,
+            ],
         ]);
     }
 
@@ -423,9 +429,15 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Withdrawal request submitted successfully',
             'amount' => $validated['amount'],
-            'balance_available' => $result->balance_available,
             'bank_code' => $validated['bank_code'],
             'account_number' => $validated['account_number'],
+            'wallet' => [
+                'balance_available' => $result->balance_available,
+                'balance_total' => $result->balance_total,
+                'balance_pending' => $result->balance_pending,
+                'withdraw' => $result->withdraw,
+                'deposit' => $result->deposit,
+            ],
         ]);
     }
 
