@@ -376,7 +376,6 @@ class AuthController extends Controller
     {
         $user = $request->user();
         $transactions = WalletTransaction::where('user_id', $user->id)
-            ->whereIn('type', ['topup', 'withdraw', 'auction_sold'])
             ->orderBy('created_at', 'desc')
             ->limit(20)
             ->get();
