@@ -668,6 +668,16 @@ class AdminController extends Controller
                 $wallet->balance_total += abs($transaction->amount);
                 $wallet->withdraw -= abs($transaction->amount);
                 $wallet->save();
+
+                // สร้าง transaction บอกว่าเงินคืนจาก withdraw rejected
+                WalletTransaction::create([
+                    'user_id' => $transaction->user_id,
+                    'wallet_id' => $wallet->id,
+                    'type' => 'withdraw_rejected',
+                    'amount' => abs($transaction->amount),
+                    'description' => 'คืนเงินจากการถอนที่ถูกปฏิเสธ',
+                    'balance_after' => $wallet->balance_available,
+                ]);
             }
 
             $transaction->update([
