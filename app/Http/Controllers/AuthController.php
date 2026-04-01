@@ -276,13 +276,7 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Topup successful',
             'slip_status' => 'verified',
-            'wallet' => [
-                'balance_available' => $result->balance_available,
-                'balance_total' => $result->balance_total,
-                'balance_pending' => $result->balance_pending,
-                'withdraw' => $result->withdraw,
-                'deposit' => $result->deposit,
-            ],
+            'wallet' => self::getWalletData($user->id),
         ]);
     }
 
@@ -346,8 +340,9 @@ class AuthController extends Controller
         $wallet = Wallet::where('user_id', $userId)->first();
         if (!$wallet) return null;
 
+        // นับทั้ง active (กำลังประมูล) + won (ชนะแล้วรอ confirm/ship/receive)
         $activeBidsPending = \App\Models\Bid::where('user_id', $userId)
-            ->where('status', 'active')
+            ->whereIn('status', ['active', 'won'])
             ->sum('price');
 
         $balanceAvailable = max(0, $wallet->balance_total - $activeBidsPending);
@@ -446,13 +441,7 @@ class AuthController extends Controller
             'amount' => $validated['amount'],
             'bank_code' => $validated['bank_code'],
             'account_number' => $validated['account_number'],
-            'wallet' => [
-                'balance_available' => $result->balance_available,
-                'balance_total' => $result->balance_total,
-                'balance_pending' => $result->balance_pending,
-                'withdraw' => $result->withdraw,
-                'deposit' => $result->deposit,
-            ],
+            'wallet' => self::getWalletData($user->id),
         ]);
     }
 

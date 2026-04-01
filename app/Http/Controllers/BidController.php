@@ -305,7 +305,13 @@ class BidController extends Controller
 
         try {
         DB::transaction(function () use ($product, $user, $wallet) {
-            // Lock buyer wallet ก่อน
+            // Lock product ก่อนเพื่อป้องกัน concurrent buy
+            $product = \App\Models\Product::lockForUpdate()->find($product->id);
+            if ($product->status !== 'active') {
+                throw new \Exception('Product no longer available');
+            }
+
+            // Lock buyer wallet
             $wallet = \App\Models\Wallet::lockForUpdate()->find($wallet->id);
 
             // Re-check balance ภายใน transaction
@@ -349,12 +355,6 @@ class BidController extends Controller
                     'message' => "{$product->name} has been purchased via Buy Now. Your bid has been refunded.",
                     'product_id' => $product->id,
                 ]);
-            }
-
-            // Lock product เพื่อป้องกัน concurrent buy
-            $product = \App\Models\Product::lockForUpdate()->find($product->id);
-            if ($product->status !== 'active') {
-                throw new \Exception('Product no longer available');
             }
 
             // Hold เงินใน pending (escrow) — ไม่จ่าย seller ทันที
