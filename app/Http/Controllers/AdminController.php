@@ -344,6 +344,12 @@ class AdminController extends Controller
     // === Helper: คืนเงิน escrow ให้ buyer ===
     private function refundEscrow(Order $order): void
     {
+        // เปลี่ยน bid status → lost (ป้องกัน getWalletData นับซ้ำ)
+        \App\Models\Bid::where('user_id', $order->user_id)
+            ->where('product_id', $order->product_id)
+            ->where('status', 'won')
+            ->update(['status' => 'lost']);
+
         $buyerWallet = \App\Models\Wallet::lockForUpdate()->where('user_id', $order->user_id)->first();
         if ($buyerWallet) {
             $buyerWallet->balance_pending -= $order->final_price;
@@ -366,6 +372,12 @@ class AdminController extends Controller
     // === Helper: โอนเงิน escrow ให้ seller ===
     private function releaseEscrow(Order $order): void
     {
+        // เปลี่ยน bid status → completed
+        \App\Models\Bid::where('user_id', $order->user_id)
+            ->where('product_id', $order->product_id)
+            ->where('status', 'won')
+            ->update(['status' => 'completed']);
+
         $buyerWallet = \App\Models\Wallet::lockForUpdate()->where('user_id', $order->user_id)->first();
         if ($buyerWallet) {
             $buyerWallet->balance_pending -= $order->final_price;

@@ -309,6 +309,12 @@ class PostAuctionController extends Controller
             ]);
         }
 
+        // เปลี่ยน bid status จาก won → completed (ป้องกัน getWalletData นับซ้ำ)
+        \App\Models\Bid::where('user_id', $order->user_id)
+            ->where('product_id', $order->product_id)
+            ->where('status', 'won')
+            ->update(['status' => 'completed']);
+
         // แจ้งเตือนทั้ง 2 ฝั่ง
         Notification::create([
             'user_id' => $order->user_id,
