@@ -65,69 +65,94 @@ class PostAuctionController extends Controller
             $order->ship_deadline = now()->addDays(3);
             $order->save();
 
-            // Hold เงินจาก wallet ผู้ชนะ (escrow)
+            // เช็คว่าเงินอยู่ใน pending แล้วหรือยัง (จาก bid/buyNow)
             $buyerWallet = \App\Models\Wallet::lockForUpdate()->where('user_id', $order->user_id)->first();
             if ($buyerWallet) {
-                // เช็คว่ามีเงินพอ
-                if ($buyerWallet->balance_available < $order->final_price) {
-                    // ไม่พอ → ยกเลิก order
-                    $order->status = 'cancelled';
-                    $order->save();
+                // เช็คว่ามี active bid สำหรับ order นี้ (เงินอยู่ใน pending แล้ว)
+                $activeBid = \App\Models\Bid::where('user_id', $order->user_id)
+                    ->where('product_id', $order->product_id)
+                    ->where('status', 'won')
+                    ->first();
 
-                    Notification::create([
+                if ($activeBid) {
+                    // เงินอยู่ใน pending จากตอน bid/buyNow แล้ว — ไม่ต้องหักซ้ำ
+                    // แค่บันทึก transaction สำหรับ audit
+                    WalletTransaction::create([
                         'user_id' => $order->user_id,
-                        'type' => 'order',
-                        'title' => 'Order cancelled — insufficient funds',
-                        'message' => "Your order for {$order->product->name} was cancelled due to insufficient wallet balance.",
-                        'product_id' => $order->product_id,
+                        'wallet_id' => $buyerWallet->id,
+                        'type' => 'escrow_hold',
+                        'amount' => -$order->final_price,
+                        'description' => "Escrow confirmed: {$order->product->name}",
+                        'reference_type' => 'order',
+                        'reference_id' => $order->id,
+                        'balance_after' => $buyerWallet->balance_available,
                     ]);
-                    Notification::create([
-                        'user_id' => $order->seller_id,
-                        'type' => 'order',
-                        'title' => 'Order cancelled',
-                        'message' => "The order for {$order->product->name} was cancelled because the buyer has insufficient funds.",
-                        'product_id' => $order->product_id,
+                } else {
+                    // ไม่มี bid (edge case) — hold จาก available
+                    if ($buyerWallet->balance_available < $order->final_price) {
+                        $order->status = 'cancelled';
+                        $order->save();
+
+                        Notification::create([
+                            'user_id' => $order->user_id,
+                            'type' => 'order',
+                            'title' => 'Order cancelled — insufficient funds',
+                            'message' => "Your order for {$order->product->name} was cancelled due to insufficient wallet balance.",
+                            'product_id' => $order->product_id,
+                        ]);
+                        Notification::create([
+                            'user_id' => $order->seller_id,
+                            'type' => 'order',
+                            'title' => 'Order cancelled',
+                            'message' => "The order for {$order->product->name} was cancelled because the buyer has insufficient funds.",
+                            'product_id' => $order->product_id,
+                        ]);
+                        return;
+                    }
+
+                    $buyerWallet->balance_available -= $order->final_price;
+                    $buyerWallet->balance_pending += $order->final_price;
+                    $buyerWallet->save();
+
+                    WalletTransaction::create([
+                        'user_id' => $order->user_id,
+                        'wallet_id' => $buyerWallet->id,
+                        'type' => 'escrow_hold',
+                        'amount' => -$order->final_price,
+                        'description' => "Escrow hold: {$order->product->name}",
+                        'reference_type' => 'order',
+                        'reference_id' => $order->id,
+                        'balance_after' => $buyerWallet->balance_available,
                     ]);
-                    return;
                 }
-
-                $buyerWallet->balance_available -= $order->final_price;
-                $buyerWallet->balance_pending += $order->final_price;
-                $buyerWallet->save();
-
-                WalletTransaction::create([
-                    'user_id' => $order->user_id,
-                    'wallet_id' => $buyerWallet->id,
-                    'type' => 'escrow_hold',
-                    'amount' => -$order->final_price,
-                    'description' => "Escrow hold: {$order->product->name}",
-                    'reference_type' => 'order',
-                    'reference_id' => $order->id,
-                    'balance_after' => $buyerWallet->balance_available,
-                ]);
             }
 
-            // แจ้งเตือน Seller ว่า Buyer confirm แล้ว ให้ส่งของ
-            Notification::create([
-                'user_id' => $order->seller_id,
-                'type' => 'order',
-                'title' => 'Buyer confirmed! Please ship the item',
-                'message' => "The buyer has confirmed the order for {$order->product->name}. Please ship the item within 3 days.",
-                'product_id' => $order->product_id,
-            ]);
+            // แจ้งเตือน Seller ว่า Buyer confirm แล้ว ให้ส่งของ (เฉพาะเมื่อ order ยัง confirmed)
+            if ($order->status === 'confirmed') {
+                Notification::create([
+                    'user_id' => $order->seller_id,
+                    'type' => 'order',
+                    'title' => 'Buyer confirmed! Please ship the item',
+                    'message' => "The buyer has confirmed the order for {$order->product->name}. Please ship the item within 3 days.",
+                    'product_id' => $order->product_id,
+                ]);
+            }
         });
 
         $order->refresh();
-        $freshWallet = \App\Models\Wallet::where('user_id', $request->user()->id)->first();
+
+        // ถ้า order ถูก cancel ให้ return error
+        if ($order->status === 'cancelled') {
+            return response()->json([
+                'message' => 'Order cancelled due to insufficient funds',
+                'order_status' => $order->status,
+            ], 400);
+        }
 
         return response()->json([
             'message' => 'Order confirmed successfully',
             'order_status' => $order->status,
-            'wallet' => [
-                'balance_available' => $freshWallet->balance_available,
-                'balance_pending' => $freshWallet->balance_pending,
-                'balance_total' => $freshWallet->balance_total,
-            ],
+            'wallet' => \App\Http\Controllers\AuthController::getWalletData($request->user()->id),
         ]);
     }
 
@@ -237,15 +262,9 @@ class PostAuctionController extends Controller
             $this->releaseEscrow($order);
         });
 
-        $freshWallet = \App\Models\Wallet::where('user_id', $request->user()->id)->first();
-
         return response()->json([
             'message' => 'Order completed! Payment released to seller.',
-            'wallet' => [
-                'balance_available' => $freshWallet->balance_available,
-                'balance_pending' => $freshWallet->balance_pending,
-                'balance_total' => $freshWallet->balance_total,
-            ],
+            'wallet' => \App\Http\Controllers\AuthController::getWalletData($request->user()->id),
         ]);
     }
 

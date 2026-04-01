@@ -53,6 +53,10 @@ class CloseExpiredAuctions extends Command
 
             // ปิดประมูลและสร้าง order
             DB::transaction(function () use ($product, $winningBid) {
+                // Lock product เพื่อป้องกัน duplicate close
+                $product = Product::lockForUpdate()->find($product->id);
+                if ($product->status !== 'active') return;
+
                 // อัพเดทสถานะ bid
                 $winningBid->update(['status' => 'won']);
 

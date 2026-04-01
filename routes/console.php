@@ -7,3 +7,6 @@ Schedule::command('auctions:close-expired')->everyMinute();
 
 // แจ้งเตือนใกล้หมดเวลาประมูล (1 ชม. + 15 นาที) + แจ้ง watchers เมื่อเปิดประมูล
 Schedule::command('auctions:notify-ending-soon')->everyMinute()->withoutOverlapping();
+
+// จัดการ order ที่หมดเวลา confirm/ship
+Schedule::command('orders:handle-expired')->everyFiveMinutes()->withoutOverlapping();

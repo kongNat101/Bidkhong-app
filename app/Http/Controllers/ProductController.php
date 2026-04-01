@@ -163,7 +163,7 @@ class ProductController extends Controller
             'description' => ['nullable', 'string'],
             'starting_price' => ['required', 'numeric', 'min:0'],
             'bid_increment' => ['required', 'numeric', 'min:1'],
-            'buyout_price' => ['nullable', 'numeric', 'min:0'],
+            'buyout_price' => ['nullable', 'numeric', 'gt:starting_price'],
             'auction_start_time' => ['nullable', 'date', 'after_or_equal:now'],
             'auction_end_time' => ['nullable', 'date', 'after:now', 'required_without:duration'],
             'duration' => ['nullable', 'integer', 'in:1,2,3,4,5', 'required_without:auction_end_time'],
@@ -349,6 +349,29 @@ class ProductController extends Controller
             return response()->json([
                 'message' => 'Only the product owner can delete this product'
             ], 403);
+        }
+
+        // ห้ามลบสินค้าที่กำลังประมูลหรือมี active bids หรือมี orders
+        if (in_array($product->status, ['active', 'completed'])) {
+            return response()->json([
+                'message' => 'Cannot delete product with status: ' . $product->status
+            ], 400);
+        }
+
+        $activeBids = \App\Models\Bid::where('product_id', $product->id)
+            ->whereIn('status', ['active'])
+            ->exists();
+        if ($activeBids) {
+            return response()->json([
+                'message' => 'Cannot delete product with active bids'
+            ], 400);
+        }
+
+        $hasOrders = \App\Models\Order::where('product_id', $product->id)->exists();
+        if ($hasOrders) {
+            return response()->json([
+                'message' => 'Cannot delete product with existing orders'
+            ], 400);
         }
 
         // ลบรูปหลัก

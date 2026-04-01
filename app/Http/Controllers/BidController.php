@@ -14,7 +14,7 @@ class BidController extends Controller
     public function bid(Request $request, $productId)
     {
         $validated = $request->validate([
-            'price' => ['required', 'numeric', 'min:0'],
+            'price' => ['required', 'numeric', 'min:1'],
         ]);
 
         $product = Product::findOrFail($productId);
@@ -71,7 +71,16 @@ class BidController extends Controller
 
         try {
         DB::transaction(function () use ($product, $user, $validated, $wallet) {
-            // Lock wallet ก่อนเพื่อป้องกัน race condition
+            // Lock product + wallet ก่อนเพื่อป้องกัน race condition
+            $product = \App\Models\Product::lockForUpdate()->find($product->id);
+            if ($product->status !== 'active') {
+                throw new \Exception('Auction is no longer active');
+            }
+            // Re-validate bid price หลัง lock
+            if ($validated['price'] <= $product->current_price) {
+                throw new \Exception('Bid must be higher than current price');
+            }
+
             $wallet = \App\Models\Wallet::lockForUpdate()->find($wallet->id);
 
             // หา bid เก่าที่ active
@@ -162,22 +171,19 @@ class BidController extends Controller
             if (str_contains($e->getMessage(), 'Insufficient balance')) {
                 return response()->json(['message' => 'Insufficient balance'], 400);
             }
+            if (str_contains($e->getMessage(), 'no longer active') || str_contains($e->getMessage(), 'higher than current')) {
+                return response()->json(['message' => $e->getMessage()], 400);
+            }
             throw $e;
         }
 
         // โหลดเวลาใหม่ (อาจถูก anti-sniping ขยายเวลา)
         $product->refresh();
-        $freshWallet = \App\Models\Wallet::where('user_id', $user->id)->first();
-
         return response()->json([
             'message' => 'Bid placed successfully',
             'current_price' => $validated['price'],
             'auction_end_time' => $product->auction_end_time,
-            'wallet' => [
-                'balance_available' => $freshWallet->balance_available,
-                'balance_pending' => $freshWallet->balance_pending,
-                'balance_total' => $freshWallet->balance_total,
-            ],
+            'wallet' => \App\Http\Controllers\AuthController::getWalletData($user->id),
         ], 201);
     }
 
@@ -345,9 +351,15 @@ class BidController extends Controller
                 ]);
             }
 
-            // หักเงินจาก buyer wallet
+            // Lock product เพื่อป้องกัน concurrent buy
+            $product = \App\Models\Product::lockForUpdate()->find($product->id);
+            if ($product->status !== 'active') {
+                throw new \Exception('Product no longer available');
+            }
+
+            // Hold เงินใน pending (escrow) — ไม่จ่าย seller ทันที
             $wallet->balance_available -= $product->buyout_price;
-            $wallet->balance_total -= $product->buyout_price;
+            $wallet->balance_pending += $product->buyout_price;
             $wallet->save();
 
             // บันทึก transaction ของ buyer
@@ -361,26 +373,6 @@ class BidController extends Controller
                 'reference_id' => $product->id,
                 'balance_after' => $wallet->balance_available,
             ]);
-
-            // โอนเงินให้ seller
-            $sellerWallet = \App\Models\Wallet::lockForUpdate()->where('user_id', $product->user_id)->first();
-            if ($sellerWallet) {
-                $sellerWallet->balance_available += $product->buyout_price;
-                $sellerWallet->balance_total += $product->buyout_price;
-                $sellerWallet->save();
-
-                // บันทึก transaction ของ seller
-                WalletTransaction::create([
-                    'user_id' => $product->user_id,
-                    'wallet_id' => $sellerWallet->id,
-                    'type' => 'auction_sold',
-                    'amount' => $product->buyout_price,
-                    'description' => "Sold (Buy Now): {$product->name}",
-                    'reference_type' => 'product',
-                    'reference_id' => $product->id,
-                    'balance_after' => $sellerWallet->balance_available,
-                ]);
-            }
 
             // สร้าง bid record สำหรับ buy now
             Bid::create([
@@ -425,22 +417,16 @@ class BidController extends Controller
             ]);
         });
         } catch (\Exception $e) {
-            if (str_contains($e->getMessage(), 'Insufficient balance')) {
-                return response()->json(['message' => 'Insufficient balance'], 400);
+            if (str_contains($e->getMessage(), 'Insufficient balance') || str_contains($e->getMessage(), 'no longer available')) {
+                return response()->json(['message' => $e->getMessage()], 400);
             }
             throw $e;
         }
 
-        $freshWallet = \App\Models\Wallet::where('user_id', $user->id)->first();
-
         return response()->json([
             'message' => 'Purchase successful',
             'product' => $product->fresh(),
-            'wallet' => [
-                'balance_available' => $freshWallet->balance_available,
-                'balance_pending' => $freshWallet->balance_pending,
-                'balance_total' => $freshWallet->balance_total,
-            ],
+            'wallet' => \App\Http\Controllers\AuthController::getWalletData($user->id),
         ], 200);
     }
 }

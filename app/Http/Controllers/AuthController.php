@@ -340,31 +340,37 @@ class AuthController extends Controller
         }
     }
 
-    // GET /api/wallet - ดูยอดเงินใน wallet (realtime)
-    public function getWallet(Request $request)
+    // Helper: คำนวณ wallet data ที่ถูกต้อง (ใช้ทุก endpoint)
+    public static function getWalletData(int $userId): ?array
     {
-        $userId = $request->user()->id;
         $wallet = Wallet::where('user_id', $userId)->first();
+        if (!$wallet) return null;
 
-        if (!$wallet) {
-            return response()->json(['message' => 'Wallet not found'], 404);
-        }
-
-        // คำนวณ pending จาก active bids จริง (แม่นยำกว่าค่าใน DB)
         $activeBidsPending = \App\Models\Bid::where('user_id', $userId)
             ->where('status', 'active')
             ->sum('price');
 
-        // คำนวณ available = total - pending (ป้องกันค่าผิดจาก seeder)
-        $balanceAvailable = $wallet->balance_total - $activeBidsPending;
+        $balanceAvailable = max(0, $wallet->balance_total - $activeBidsPending);
 
-        return response()->json([
-            'balance_available' => number_format(max(0, $balanceAvailable), 2, '.', ''),
+        return [
+            'balance_available' => number_format($balanceAvailable, 2, '.', ''),
             'balance_total' => $wallet->balance_total,
             'balance_pending' => number_format($activeBidsPending, 2, '.', ''),
             'withdraw' => $wallet->withdraw,
             'deposit' => $wallet->deposit,
-        ]);
+        ];
+    }
+
+    // GET /api/wallet - ดูยอดเงินใน wallet (realtime)
+    public function getWallet(Request $request)
+    {
+        $walletData = self::getWalletData($request->user()->id);
+
+        if (!$walletData) {
+            return response()->json(['message' => 'Wallet not found'], 404);
+        }
+
+        return response()->json($walletData);
     }
 
     // GET /api/wallet/transactions - Get wallet transactions (topup + withdraw เท่านั้น)

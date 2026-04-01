@@ -344,7 +344,7 @@ class AdminController extends Controller
     // === Helper: คืนเงิน escrow ให้ buyer ===
     private function refundEscrow(Order $order): void
     {
-        $buyerWallet = $order->user->wallet;
+        $buyerWallet = \App\Models\Wallet::lockForUpdate()->where('user_id', $order->user_id)->first();
         if ($buyerWallet) {
             $buyerWallet->balance_pending -= $order->final_price;
             $buyerWallet->balance_available += $order->final_price;
@@ -366,7 +366,7 @@ class AdminController extends Controller
     // === Helper: โอนเงิน escrow ให้ seller ===
     private function releaseEscrow(Order $order): void
     {
-        $buyerWallet = $order->user->wallet;
+        $buyerWallet = \App\Models\Wallet::lockForUpdate()->where('user_id', $order->user_id)->first();
         if ($buyerWallet) {
             $buyerWallet->balance_pending -= $order->final_price;
             $buyerWallet->balance_total -= $order->final_price;
@@ -384,7 +384,7 @@ class AdminController extends Controller
             ]);
         }
 
-        $sellerWallet = $order->seller->wallet;
+        $sellerWallet = \App\Models\Wallet::lockForUpdate()->where('user_id', $order->seller_id)->first();
         if ($sellerWallet) {
             $sellerWallet->balance_available += $order->final_price;
             $sellerWallet->balance_total += $order->final_price;
@@ -648,20 +648,22 @@ class AdminController extends Controller
             ], 422);
         }
 
-        // คืนเงินกลับ wallet
-        $wallet = $transaction->user->wallet;
-        if ($wallet) {
-            $wallet->balance_available += abs($transaction->amount);
-            $wallet->balance_total += abs($transaction->amount);
-            $wallet->withdraw -= abs($transaction->amount);
-            $wallet->save();
-        }
+        DB::transaction(function () use ($transaction, $request) {
+            // คืนเงินกลับ wallet
+            $wallet = \App\Models\Wallet::lockForUpdate()->where('user_id', $transaction->user_id)->first();
+            if ($wallet) {
+                $wallet->balance_available += abs($transaction->amount);
+                $wallet->balance_total += abs($transaction->amount);
+                $wallet->withdraw -= abs($transaction->amount);
+                $wallet->save();
+            }
 
-        $transaction->update([
-            'withdraw_status' => 'rejected',
-            'confirmed_by' => $request->user()->id,
-            'confirmed_at' => now(),
-        ]);
+            $transaction->update([
+                'withdraw_status' => 'rejected',
+                'confirmed_by' => $request->user()->id,
+                'confirmed_at' => now(),
+            ]);
+        });
 
         // แจ้งเตือน user
         Notification::create([
