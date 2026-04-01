@@ -343,16 +343,22 @@ class AuthController extends Controller
     // GET /api/wallet - ดูยอดเงินใน wallet (realtime)
     public function getWallet(Request $request)
     {
-        $wallet = Wallet::where('user_id', $request->user()->id)->first();
+        $userId = $request->user()->id;
+        $wallet = Wallet::where('user_id', $userId)->first();
 
         if (!$wallet) {
             return response()->json(['message' => 'Wallet not found'], 404);
         }
 
+        // คำนวณ pending จาก active bids จริง (แม่นยำกว่าค่าใน DB)
+        $activeBidsPending = \App\Models\Bid::where('user_id', $userId)
+            ->where('status', 'active')
+            ->sum('price');
+
         return response()->json([
             'balance_available' => $wallet->balance_available,
             'balance_total' => $wallet->balance_total,
-            'balance_pending' => $wallet->balance_pending,
+            'balance_pending' => number_format($activeBidsPending, 2, '.', ''),
             'withdraw' => $wallet->withdraw,
             'deposit' => $wallet->deposit,
         ]);
