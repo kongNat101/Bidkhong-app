@@ -43,11 +43,11 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        // Load wallet relationship
-        $user->load('wallet');
+        $userData = $user->toArray();
+        $userData['wallet'] = self::getWalletData($user->id);
 
         return response()->json([
-            'user' => $user,
+            'user' => $userData,
             'token' => $token,
         ], 201);
     }
@@ -69,11 +69,11 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        // Load wallet relationship
-        $user->load('wallet');
+        $userData = $user->toArray();
+        $userData['wallet'] = self::getWalletData($user->id);
 
         return response()->json([
-            'user' => $user,
+            'user' => $userData,
             'token' => $token,
         ]);
     }
@@ -89,9 +89,10 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        // Load wallet relationship to include wallet data
-        $user = $request->user()->load('wallet');
-        return response()->json($user);
+        $user = $request->user();
+        $userData = $user->toArray();
+        $userData['wallet'] = self::getWalletData($user->id);
+        return response()->json($userData);
     }
 
     // PATCH /api/profile - แก้ไขข้อมูลส่วนตัว
@@ -124,11 +125,13 @@ class AuthController extends Controller
         }
 
         $user->update($changes);
-        $user->load('wallet');
+
+        $userData = $user->fresh()->toArray();
+        $userData['wallet'] = self::getWalletData($user->id);
 
         return response()->json([
             'message' => 'Profile updated successfully',
-            'user' => $user,
+            'user' => $userData,
         ]);
     }
 
