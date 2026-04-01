@@ -355,8 +355,11 @@ class AuthController extends Controller
             ->where('status', 'active')
             ->sum('price');
 
+        // คำนวณ available = total - pending (ป้องกันค่าผิดจาก seeder)
+        $balanceAvailable = $wallet->balance_total - $activeBidsPending;
+
         return response()->json([
-            'balance_available' => $wallet->balance_available,
+            'balance_available' => number_format(max(0, $balanceAvailable), 2, '.', ''),
             'balance_total' => $wallet->balance_total,
             'balance_pending' => number_format($activeBidsPending, 2, '.', ''),
             'withdraw' => $wallet->withdraw,
