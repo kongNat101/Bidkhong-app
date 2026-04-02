@@ -45,7 +45,7 @@ Route::middleware('throttle:60,1')->group(function () {
     // Public Stats (สำหรับ welcome page)
     Route::get('/public/stats', function () {
         return response()->json([
-            'total_users' => \App\Models\User::where('role', 'user')->count(),
+            'total_users' => \App\Models\User::count(),
             'active_auctions' => \App\Models\Product::where('status', 'active')
                 ->where('auction_end_time', '>', now())
                 ->count(),
