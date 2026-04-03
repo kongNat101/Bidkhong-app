@@ -44,11 +44,20 @@ Route::middleware('throttle:60,1')->group(function () {
 
     // Public Stats (สำหรับ welcome page)
     Route::get('/public/stats', function () {
+        // เช็คว่า AI Recommendation พร้อมใช้งานหรือยัง
+        $recommendationReady = false;
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout(3)
+                ->get(config('services.recommendation.base_url') . '/health');
+            $recommendationReady = $response->json('model_loaded') ?? false;
+        } catch (\Exception $e) {}
+
         return response()->json([
             'total_users' => \App\Models\User::count(),
             'active_auctions' => \App\Models\Product::where('status', 'active')
                 ->where('auction_end_time', '>', now())
                 ->count(),
+            'recommendation_ready' => $recommendationReady,
         ]);
     });
 });
