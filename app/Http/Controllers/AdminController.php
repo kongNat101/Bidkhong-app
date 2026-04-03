@@ -675,7 +675,7 @@ class AdminController extends Controller
                     'wallet_id' => $wallet->id,
                     'type' => 'withdraw_rejected',
                     'amount' => abs($transaction->amount),
-                    'description' => 'คืนเงินจากการถอนที่ถูกปฏิเสธ',
+                    'description' => 'Withdrawal rejected — funds returned to wallet',
                     'balance_after' => $wallet->balance_available,
                 ]);
             }

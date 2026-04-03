@@ -421,7 +421,7 @@ class AuthController extends Controller
                 'wallet_id' => $wallet->id,
                 'type' => 'withdraw',
                 'amount' => -$validated['amount'],
-                'description' => "Withdraw to {$validated['bank_code']} - {$validated['account_number']} ({$validated['account_name']})",
+                'description' => "Withdrawal request submitted to {$validated['bank_code']} ({$validated['account_name']})",
                 'balance_after' => $wallet->balance_available,
                 'withdraw_status' => 'pending',
                 'bank_code' => $validated['bank_code'],
