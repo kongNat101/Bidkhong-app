@@ -39,6 +39,9 @@ Route::middleware('throttle:60,1')->group(function () {
     // Seller Ratings (public)
     Route::get('/users/{id}/ratings', [ReviewController::class , 'getSellerRatings']);
 
+    // Bid History (public)
+    Route::get('/products/{id}/bids', [BidController::class , 'getProductBids']);
+
     // Recommendations (similar items - public)
     Route::get('/products/{id}/similar', [RecommendationController::class , 'similar']);
 
@@ -91,7 +94,6 @@ Route::middleware(['auth:sanctum', 'check-banned', 'throttle:100,1'])->group(fun
     // Bidding
     Route::post('/products/{id}/bid', [BidController::class , 'bid']);
     Route::post('/products/{id}/buy-now', [BidController::class , 'buyNow']);
-    Route::get('/products/{id}/bids', [BidController::class , 'getProductBids']);
     Route::get('/users/me/bids', [BidController::class , 'getUserBids']);
     Route::get('/users/me/products', [ProductController::class , 'myProducts']);
 
