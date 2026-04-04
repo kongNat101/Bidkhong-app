@@ -206,7 +206,7 @@ class ProductSeeder extends Seeder
     private function downloadImage(Product $product, string $name, string $keyword): void
     {
         try {
-            $filename = 'seed_' . Str::slug($name) . '.jpg';
+            $filename = 'seed_' . Str::slug($keyword) . '.jpg';
             $filepath = "products/{$filename}";
 
             // ถ้ารูปมีอยู่แล้ว ไม่ต้องดาวน์โหลดซ้ำ
