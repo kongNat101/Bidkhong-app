@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Bid;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductImage;
 use App\Models\Subcategory;
 use App\Models\User;
 use App\Models\Wallet;
@@ -189,8 +190,32 @@ class ProductSeeder extends Seeder
             // อัปเดต created_at
             $product->update(['created_at' => $auctionStart]);
 
-            // ดาวน์โหลดรูป
+            // ดาวน์โหลดรูปหลัก
             $this->downloadImage($product, $name, $imageKeyword);
+
+            // ดาวน์โหลดรูปเพิ่มเติม (gallery) สำหรับบางสินค้า
+            $extraImagesMap = [
+                'iphone' => ['smartphone,screen', 'phone,box,unboxing', 'iphone,back'],
+                'macbook+laptop' => ['laptop,keyboard', 'macbook,screen', 'laptop,charger'],
+                'sneakers' => ['jordan,shoe,sole', 'sneaker,box', 'nike,shoe,detail'],
+                'luxury+handbag' => ['gucci,leather,detail', 'handbag,strap', 'designer,bag,inside'],
+                'honda+civic' => ['sedan,interior', 'car,dashboard', 'car,engine', 'honda,wheel'],
+                'rolex+watch' => ['watch,dial,closeup', 'luxury,watch,box', 'watch,wrist'],
+                'ducati+motorcycle' => ['motorcycle,engine', 'motorcycle,exhaust', 'ducati,dashboard'],
+                'canon+camera' => ['camera,lens', 'dslr,viewfinder', 'camera,box,accessories'],
+                'airpods' => ['earbuds,case', 'airpods,charging'],
+                'leather+sofa' => ['sofa,living,room', 'leather,cushion,detail'],
+                'oil+painting' => ['painting,detail,brush', 'canvas,frame,art'],
+                'acoustic+guitar' => ['guitar,strings,closeup', 'guitar,headstock'],
+                'ipad+tablet' => ['tablet,pencil', 'ipad,screen,display'],
+                'louis+vuitton' => ['lv,monogram,detail', 'designer,bag,receipt'],
+                'wristwatch' => ['gshock,display', 'watch,strap'],
+                'trading+cards' => ['pokemon,card,holo', 'card,collection'],
+            ];
+
+            if (isset($extraImagesMap[$imageKeyword])) {
+                $this->downloadGalleryImages($product, $imageKeyword, $extraImagesMap[$imageKeyword]);
+            }
 
             // สร้าง Bids
             if ($numBids > 0) {
@@ -232,6 +257,42 @@ class ProductSeeder extends Seeder
         }
         catch (\Exception $e) {
             echo "  Skip (error): {$name}" . PHP_EOL;
+        }
+    }
+
+    private function downloadGalleryImages(Product $product, string $mainKeyword, array $extraKeywords): void
+    {
+        foreach ($extraKeywords as $index => $keyword) {
+            try {
+                $slug = Str::slug($keyword);
+                $filename = "seed_{$slug}.jpg";
+                $filepath = "products/{$filename}";
+
+                if (!Storage::disk('public')->exists($filepath)) {
+                    $imageUrl = "https://loremflickr.com/800/600/{$keyword}";
+                    $context = stream_context_create([
+                        'http' => [
+                            'timeout' => 15,
+                            'follow_location' => true,
+                        ],
+                    ]);
+                    $imageContent = @file_get_contents($imageUrl, false, $context);
+
+                    if ($imageContent && strlen($imageContent) > 1000) {
+                        Storage::disk('public')->put($filepath, $imageContent);
+                    } else {
+                        continue;
+                    }
+                }
+
+                ProductImage::create([
+                    'product_id' => $product->id,
+                    'image_url' => $filepath,
+                    'sort_order' => $index + 1,
+                ]);
+            } catch (\Exception $e) {
+                // skip
+            }
         }
     }
 
