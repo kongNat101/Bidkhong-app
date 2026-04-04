@@ -376,7 +376,7 @@ class AuthController extends Controller
     {
         $user = $request->user();
         $transactions = WalletTransaction::where('user_id', $user->id)
-            ->whereNotIn('type', ['bid_placed', 'bid_refund'])
+            ->whereNotIn('type', ['bid_placed', 'bid_refund', 'escrow_hold', 'escrow_release'])
             ->orderBy('created_at', 'desc')
             ->limit(20)
             ->get();

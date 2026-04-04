@@ -368,7 +368,7 @@ class BidController extends Controller
                 'wallet_id' => $wallet->id,
                 'type' => 'auction_won',
                 'amount' => -$product->buyout_price,
-                'description' => "Buy Now: {$product->name}",
+                'description' => "Buy: {$product->name}",
                 'reference_type' => 'product',
                 'reference_id' => $product->id,
                 'balance_after' => $wallet->balance_available,
