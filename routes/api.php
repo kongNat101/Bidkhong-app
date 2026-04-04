@@ -55,19 +55,9 @@ Route::middleware('throttle:60,1')->group(function () {
         ]);
     });
 
-    // เช็คว่า AI Recommendation พร้อมใช้งานหรือยัง
+    // Recommendation status (ไม่ login → ready: false เสมอ)
     Route::get('/recommendations/status', function () {
-        try {
-            $response = \Illuminate\Support\Facades\Http::timeout(3)
-                ->get(config('services.recommendation.base_url') . '/health');
-            return response()->json([
-                'ready' => $response->json('model_loaded') ?? false,
-                'total_users' => $response->json('total_users') ?? 0,
-                'total_products' => $response->json('total_products') ?? 0,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json(['ready' => false]);
-        }
+        return response()->json(['ready' => false, 'total_bids' => 0, 'min_bids_required' => 3]);
     });
 });
 
@@ -132,6 +122,7 @@ Route::middleware(['auth:sanctum', 'check-banned', 'throttle:100,1'])->group(fun
 
     // Recommendations (personalized - ต้อง login)
     Route::get('/recommendations', [RecommendationController::class , 'forUser']);
+    Route::get('/recommendations/status', [RecommendationController::class , 'status']);
 });
 
 // Admin Routes (ต้อง login + เป็น admin) - Rate limited to 100 requests per minute
