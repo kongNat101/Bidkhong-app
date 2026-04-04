@@ -215,8 +215,8 @@ class ProductSeeder extends Seeder
                 return;
             }
 
-            // ดาวน์โหลดจาก picsum.photos
-            $imageUrl = "https://picsum.photos/seed/{$keyword}/800/600";
+            // ดาวน์โหลดจาก loremflickr (keyword-relevant images)
+            $imageUrl = "https://loremflickr.com/800/600/{$keyword}";
             $context = stream_context_create([
                 'http' => [
                     'timeout' => 15,
@@ -248,13 +248,20 @@ class ProductSeeder extends Seeder
             // สถานะ: bid สุดท้ายเป็น active, ที่เหลือเป็น outbid
             $status = ($i === $numBids - 1) ? 'active' : 'outbid';
 
-            Bid::create([
+            $bidTime = $product->auction_start_time->copy()->addHours($i + 1);
+
+            $bid = Bid::create([
                 'user_id' => $bidder->id,
                 'product_id' => $product->id,
                 'price' => $currentBidPrice,
-                'time' => $product->created_at->addHours($i + 1),
+                'time' => $bidTime,
                 'status' => $status,
             ]);
+
+            // ให้ created_at ตรงกับ time เพื่อให้ "x ago" แสดงถูกต้อง
+            $bid->timestamps = false;
+            $bid->created_at = $bidTime;
+            $bid->save();
         }
 
         // อัปเดต current_price ตาม bid ล่าสุด
