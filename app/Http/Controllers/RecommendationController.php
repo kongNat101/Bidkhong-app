@@ -15,14 +15,19 @@ class RecommendationController extends Controller
     // GET /api/recommendations/status — เช็คว่า user คนนี้พร้อมรับ recommend เฉพาะตัวหรือยัง
     public function status(Request $request)
     {
-        $user = $request->user();
+        // พยายามดึง user จาก token (ถ้ามี) โดยไม่ error
+        $user = null;
+        try {
+            $user = auth('sanctum')->user();
+        } catch (\Exception $e) {
+            // ไม่มี token หรือ token ผิด
+        }
 
         if (!$user) {
             return response()->json([
                 'ready' => false,
                 'total_bids' => 0,
                 'min_bids_required' => self::MIN_BIDS_FOR_READY,
-                'message' => 'ต้อง login ก่อน',
             ]);
         }
 

@@ -55,10 +55,8 @@ Route::middleware('throttle:60,1')->group(function () {
         ]);
     });
 
-    // Recommendation status (ไม่ login → ready: false เสมอ)
-    Route::get('/recommendations/status', function () {
-        return response()->json(['ready' => false, 'total_bids' => 0, 'min_bids_required' => 3]);
-    });
+    // Recommendation status (เช็คจาก token ถ้ามี ถ้าไม่มี → ready: false)
+    Route::get('/recommendations/status', [RecommendationController::class , 'status']);
 });
 
 // Protected Routes (ต้อง login + เช็คแบน) - Rate limited to 100 requests per minute
@@ -122,7 +120,6 @@ Route::middleware(['auth:sanctum', 'check-banned', 'throttle:100,1'])->group(fun
 
     // Recommendations (personalized - ต้อง login)
     Route::get('/recommendations', [RecommendationController::class , 'forUser']);
-    Route::get('/recommendations/status', [RecommendationController::class , 'status']);
 });
 
 // Admin Routes (ต้อง login + เป็น admin) - Rate limited to 100 requests per minute
